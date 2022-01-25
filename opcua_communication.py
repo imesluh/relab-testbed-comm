@@ -2,7 +2,9 @@ from opcua import Client, ua
 import time
 import datetime
 import numpy as np
-
+import gevent
+import os
+import csv
 
 def connect(address):
     conn = Client(address)
@@ -85,4 +87,78 @@ def readAxValues(nodes):
     pos = [x for x in nodes.get_children()[3].get_children()[0].get_value()]
     pos[:3] = pos[:3]*1000
     return t, q, dq, pos
+
+
+def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *args):
+    """
+        Die Funktion schreibt die Daten mit der gewünschten Samplezeit (vorgegeben am Anfang der Funktoin) i eine csv-Datei.
+
+        :param filename: Name der csv-Datei, wenn leer, wird das Array im Arbeitsspeicher zurückgegeben
+        :type filename: basestring
+        :param basedir: Pfad der Datei (ohne subpfad exchange, der in der Funktion gesetzt wird)
+        :type basedir: basestring
+        :param indices: Indizes aus dem Messvektor, die gespeichert werden sollen (ohne die Zeit t, Indizes daher um 1 verschoben)
+        :type indices : list of int
+        :param clmnNames: Lister der Spaltennamen für den Header der csv (mit der Zeit t)
+        :type clmnNames : list of basestring
+        :param yu_nodes: Nodes der OPC-UA-Verbindung zum Yu
+        :tyoe yu_nodes: opcua nodes
+        :param stop: Art des Beenden der Aufzeichnung
+        :type stop: {'extern', 'intern'}
+        :param args: wenn der stop 'intern' ist, muss die Dauer der Aufzeichnung vorgegeben werden
+        :type args: float
+        """
+    # Initialisierung
+    sample_time = 0.01
+    data_now = []
+    data = []
+    for index in indices:
+        data_now.append(0)
+    first = True
+    lastT = -1
+    # Wenn der Stop der Aufzeichnung extern getriggert wird (durch eine kill des aufrufenden Greenlets glet.kill())
+    if stop.lower() == 'extern':
+        try:
+            os.remove(basedir + '/exchange/' + filename)
+        except:
+            pass
+        while True:
+            with open((basedir + '/exchange/' + filename), 'a') as csv_clear:
+                spamwriter = csv.writer(csv_clear, delimiter=';', lineterminator='\n')
+                if first:
+                    t, q, dq, pos = readAxValues(yu_nodes)
+                    startT = t
+                    spamwriter.writerow(clmnNames)
+                    first = False
+                t, q, dq, pos = readAxValues(yu_nodes)
+                if (t - lastT) >= 0.97 * sample_time:
+                    lastT = t
+                    signal = np.concatenate((q, dq, pos))
+                    data_now = [signal[x] for x in indices]
+                    data_now.insert(t-startT, 0)
+                    spamwriter.writerow(data_now)
+            gevent.sleep(0.001)
+    else:
+        # Aufzeichnen für die Dauer, die über args übermittelt wird.
+        t_end = datetime.datetime.now() + datetime.timedelta(seconds=args[0]) + datetime.timedelta(seconds=0.1)
+        t_start = datetime.datetime.now()
+        t_now = t_start
+        while t_now < t_end:
+            t, q, dq, pos = readAxValues(yu_nodes)
+            t_now = datetime.datetime.now()
+            if (t - lastT) >= 0.97 * sample_time:
+                lastT = t
+                signal = np.concatenate((q, dq, pos))
+                data.append([signal[x] for x in indices])
+            gevent.sleep(0.001)
+        time = data[0][0]
+        if isinstance(filename[0], str):
+            with open((basedir + '/exchange/' + filename), 'a') as csv_clear:
+                spamwriter = csv.writer(csv_clear, delimiter=';', lineterminator='\n')
+                spamwriter.writerow(clmnNames)
+                for row in data:
+                    row[0] = row[0] - time
+                    spamwriter.writerow(row)
+        else:
+            return data
 
