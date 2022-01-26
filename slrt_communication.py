@@ -132,6 +132,10 @@ def write_target_data(filename, basedir, indices, clmnNames, length, rec_sock, s
     :type args: float
     """
     # Initialisierung
+    try:
+        os.remove(basedir + '/exchange/' + filename)
+    except:
+        pass
     sample_time = 0.01
     data_now = []
     data = []
@@ -141,10 +145,6 @@ def write_target_data(filename, basedir, indices, clmnNames, length, rec_sock, s
     lastT=-1
     # Wenn der Stop der Aufzeichnung extern getriggert wird (durch eine kill des aufrufenden Greenlets glet.kill())
     if stop.lower()=='extern':
-        try:
-            os.remove(basedir + '/exchange/' + filename)
-        except:
-            pass
         while True:
             with open((basedir + '/exchange/' + filename), 'a') as csv_clear:
                 spamwriter = csv.writer(csv_clear, delimiter=';', lineterminator = '\n')
