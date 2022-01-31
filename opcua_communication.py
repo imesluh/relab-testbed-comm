@@ -55,10 +55,10 @@ def communicate(nodes, intType, intData, timeout):
             nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32)
             tStart = datetime.datetime.now()
             while True:
-                if nodes.get_children()[7].get_children()[1].get_children()[1].get_value()<2:
+                if nodes.get_children()[7].get_children()[1].get_children()[1].get_value() < 2:
                     return True
                 if (datetime.datetime.now()-tStart).total_seconds()>timeout:
-
+                    print(nodes.get_children()[7].get_children()[1].get_children()[1].get_value())
                     raise Exception('Das Packet ist nicht innerhalb des Timeout angekommen.')
                 time.sleep(0.001)
     except Exception as e:
@@ -109,7 +109,7 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
         :type args: float
         """
     # Initialisierung
-    sample_time = 0.01
+    sample_time = 0.05
     data_now = []
     data = []
     for index in indices:
@@ -135,7 +135,7 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
                     lastT = t
                     signal = np.concatenate((q, dq, pos))
                     data_now = [signal[x] for x in indices]
-                    data_now.insert(t-startT, 0)
+                    data_now.insert(0, t-startT)
                     spamwriter.writerow(data_now)
             gevent.sleep(0.001)
     else:
@@ -148,7 +148,7 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
             t_now = datetime.datetime.now()
             if (t - lastT) >= 0.97 * sample_time:
                 lastT = t
-                signal = np.concatenate((q, dq, pos))
+                signal = np.concatenate((t, q, dq, pos))
                 data.append([signal[x] for x in indices])
             gevent.sleep(0.001)
         time = data[0][0]
