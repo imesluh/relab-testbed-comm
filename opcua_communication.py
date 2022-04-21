@@ -53,6 +53,13 @@ def communicate(nodes, intType, intData, timeout):
                 else:
                     raise Exception('intType muss in der Range 0...4 liegen.')
             nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32)
+            # print(nodes.get_children())
+            # print(nodes.get_children()[7].get_children())
+            #print(nodes.get_children()[7].get_children()[1].get_children())
+            #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
+            #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_methods())
+            #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
+            # print(nodes.get_children_descriptions)
             tStart = datetime.datetime.now()
             while True:
                 if nodes.get_children()[7].get_children()[1].get_children()[1].get_value() < 2:
@@ -162,3 +169,21 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
         else:
             return data
 
+def send_ITP(nodes, timeout):
+    """
+            Initial target post: Yu wird in Home-Position gefahren.
+
+            :param nodes: Nodes der OPCUA-Schnittstelle
+            :type nodes: OPCUA-Nodes
+            :param timeout: max. Zeit in Sekunden für das Senden
+            :type timeout: float
+            """
+    # Roboter in Home-Position fahren
+    pos_home = [0,-90,90,-90,-90,0]     #  Achswinkel der home position
+
+    for angle, axes in zip(pos_home, range(len(pos_home))):  # Achswinkel senden
+        communicate(nodes, [3, 4], [axes + 1, angle * 100], timeout)
+        time.sleep(0.01)
+
+    # Starten der Bewegung
+    communicate(nodes, int(2), 1, timeout)  # Starten der Bewegung
