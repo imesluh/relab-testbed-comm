@@ -214,12 +214,10 @@ def receive_value_from_target(rec_sock, length, dtype):
     :return: Array der Werte
     """
     i = 0
+    # read value several times to ensure getting the current value
     while i < 6:
         data = list(struct.unpack(str(length) + dtype, rec_sock.recv(length*8)))
         i += 1
-        # debugging
-        if(length == 1) and (dtype == 'd'):
-            print("rms_value: " + str(data))
     return data
 
 
@@ -240,6 +238,7 @@ def send_to_target(sock, configDest, data, dtype, sink):
     :return: Array der Werte
     """
     i = 0
+    # send value several times to ensure reliable transmission
     while i < 6:
         sock.sendto(struct.pack(('%s'+dtype) % len(data), *data), (
             configDest["IP"], configDest[sink]["Port"]))
