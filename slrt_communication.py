@@ -217,6 +217,9 @@ def receive_value_from_target(rec_sock, length, dtype):
     while i < 6:
         data = list(struct.unpack(str(length) + dtype, rec_sock.recv(length*8)))
         i += 1
+        # debugging
+        if(length == 1) and (dtype == 'd'):
+            print("rms_value: " + str(data))
     return data
 
 
