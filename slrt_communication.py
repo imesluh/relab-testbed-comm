@@ -112,7 +112,7 @@ def send_Parametrization(sock, configDest, floats, ints):
 
 def write_target_data(filename, basedir, indices, clmnNames, length, rec_sock, stop, *args):
     """
-    Die Funktion schreibt die Daten mit der gewünschten Samplezeit (vorgegeben am Anfang der Funktoin) i eine csv-Datei.
+    Die Funktion schreibt die Daten mit der gewünschten Samplezeit (vorgegeben am Anfang der Funktion) in eine csv-Datei.
 
     :param filename: Name der csv-Datei, wenn leer, wird das Array im Arbeitsspeicher zurückgegeben
     :type filename: basestring
