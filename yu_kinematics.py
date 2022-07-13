@@ -34,6 +34,33 @@ def deg2rad(qs):
     return qs
 
 
+def Rx(theta):
+    """
+        Die Funktion berechnet die Rotation der Einzeldrehungen mit den Orientierungswinkeln um die jeweiligen Achsen
+
+        :param theta: Orientierungswinkel in rad
+        :type theta: numpy.array, list
+
+        :return:Einzeldrehung Rotationsmatrix um eine Achse
+        :rtype: numpy.array, list
+
+        """
+    return np.matrix([[ 1, 0 , 0 ],
+    [ 0, m.cos(theta),-m.sin(theta)],
+    [ 0, m.sin(theta), m.cos(theta)]])
+
+def Ry(theta):
+    return np.matrix([[ m.cos(theta), 0, m.sin(theta)],
+    [ 0 , 1, 0 ],
+    [-m.sin(theta), 0, m.cos(theta)]])
+
+def Rz(theta):
+    return np.matrix([[ m.cos(theta), -m.sin(theta), 0 ],
+    [ m.sin(theta), m.cos(theta) , 0 ],
+    [ 0 , 0 , 1 ]])
+
+
+
 def direct_kinematics(q):
     """
     Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
@@ -43,7 +70,7 @@ def direct_kinematics(q):
     :type q:  numpy.array, list
 
     :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation), Spalten stehen für die verschiedenen
-             Arme. Endeffektor ist die letzte Spalte.
+             Armsegmente. Endeffektor ist die letzte Spalte.
     :rtype: numpy.array
     """
     l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290]) # Längen des Yu
@@ -69,7 +96,7 @@ def direct_kinematics(q):
     T[:,:,2]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2]))
     T[:,:,3]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3]))
     T[:,:,4]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4]))
-    T[:,:,5]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4],A[:,:,5]))
+    T[:,:,5]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4],A[:,:,5])) # 4x4 Trafo
 
     #Initialisierung der Positionsmatrix und Orientierungsmatrix
     Position=np.zeros(shape=(3,6))
