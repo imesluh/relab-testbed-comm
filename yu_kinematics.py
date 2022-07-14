@@ -1,3 +1,7 @@
+"""
+Kinematikfunktionen des Yuanda Yu und kinematik-bezogene mathematische Funktionen
+"""
+
 import numpy as np
 
 
@@ -69,9 +73,9 @@ def direct_kinematics(q):
     :param q: 6 Gelenkwinkel des Yu in rad
     :type q:  numpy.array, list
 
-    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation), Spalten stehen für die verschiedenen
-             Armsegmente. Endeffektor ist die letzte Spalte.
-    :rtype: numpy.array
+    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
+             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
+    :rtype: numpy.array, numpy.array
     """
     l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290]) # Längen des Yu
     DHP=np.array([[q[0],      l[0],       0,      -np.pi/2],
@@ -115,7 +119,8 @@ def direct_kinematics(q):
 
 
     #Rückgabe der Orientierung in 6-FHG
-    return np.vstack((Position,Orientierung))
+    # TODO: Rueckgabe trennen in Pos+Orientierung?
+    return np.vstack((Position,Orientierung)), T
 
 def detect_invalid_angpos(q, workspace, dim):
     """
