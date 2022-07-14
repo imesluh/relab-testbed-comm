@@ -51,17 +51,17 @@ def Rx(theta):
 
         """
     return np.matrix([[ 1, 0 , 0 ],
-    [ 0, m.cos(theta),-m.sin(theta)],
-    [ 0, m.sin(theta), m.cos(theta)]])
+    [ 0, math.cos(theta),-math.sin(theta)],
+    [ 0, math.sin(theta), math.cos(theta)]])
 
 def Ry(theta):
-    return np.matrix([[ m.cos(theta), 0, m.sin(theta)],
+    return np.matrix([[ math.cos(theta), 0, math.sin(theta)],
     [ 0 , 1, 0 ],
-    [-m.sin(theta), 0, m.cos(theta)]])
+    [-math.sin(theta), 0, math.cos(theta)]])
 
 def Rz(theta):
-    return np.matrix([[ m.cos(theta), -m.sin(theta), 0 ],
-    [ m.sin(theta), m.cos(theta) , 0 ],
+    return np.matrix([[ math.cos(theta), -math.sin(theta), 0 ],
+    [ math.sin(theta), math.cos(theta) , 0 ],
     [ 0 , 0 , 1 ]])
 
 def r2eulxyz(R):
@@ -168,6 +168,66 @@ def r2angvec(R):
     return theta, np.vstack(n)
 
 
+def angvec2r(u, theta):
+    """
+    Rotationsmatrix aus Achse-Winkel-Darstellung berechnen
+
+    Eingabe:
+        Drehwinkel theta (float) [1x1]
+        Drehachse u (vector) [3x1]
+
+    Ausgabe:
+        Rotationsmatrix R_u [3x3]
+    """
+    # Init
+    u = np.asarray(u)
+    theta = np.asarray(theta)
+
+    ## Calculation
+    # Hilfsvariabeln
+    cth = math.cos(theta)
+    sth = math.sin(theta)
+    vth = (1 - cth)
+
+    ux = u[0]
+    uy = u[1]
+    uz = u[2]
+
+    # 3x3 Rotationmatrix
+    # Quelle: Skript Robotik I (WS 2021/22), Ortmaier, Uni Hannover, Gl. 2.37
+    R_u = np.array([[ux ** 2 * vth + cth, ux * uy * vth - uz * sth, ux * uz * vth + uy * sth],
+                    [ux * uy * vth + uz * sth, uy ** 2 * vth + cth, uy * uz * vth - ux * sth],
+                    [ux * uz * vth - uy * sth, uy * uz * vth + ux * sth, uz ** 2 * vth + cth]])
+    return R_u
+
+
+def quat2r(quat):
+    """
+    Rotationsmatrix aus Quaterionen-Darstellung berechnen
+
+    Eingabe:
+        Quaterionenvektor quat [1x4]
+
+    Ausgabe:
+        Rotationsmatrix R_q [3x3]
+
+    """
+
+    # Init
+    quat = np.asarray(quat)
+    # Extract the values from quat
+    a = quat[0]  # Angle (Real Part)
+    b = quat[1]  # Axis (i)
+    c = quat[2]  # Axis (j)
+    d = quat[3]  # Axis (k)
+
+    # 3x3 Rotationmatrix
+    # Quelle: Skript Robotik I (WS 2021/22), Ortmaier, Uni Hannover, Gl. 2.55
+    R_q = np.array([[a ** 2 + b ** 2 - c ** 2 - d ** 2, 2 * b * c - 2 * a * d, 2 * b * d + 2 * a * c],
+                    [2 * b * c + 2 * a * d, a ** 2 - b ** 2 + c ** 2 - d ** 2, 2 * c * d - 2 * a * b],
+                    [2 * b * d - 2 * a * c, 2 * c * d + 2 * a * b, a ** 2 - b ** 2 - c ** 2 + d ** 2]])
+
+    return R_q
 
 
 def direct_kinematics(q):
