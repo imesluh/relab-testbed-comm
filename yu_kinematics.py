@@ -63,6 +63,110 @@ def Rz(theta):
     [ m.sin(theta), m.cos(theta) , 0 ],
     [ 0 , 0 , 1 ]])
 
+def r2eulxyz(R):
+    """
+    Umwandlung von Rotationsmatrix nach Euler-Darstellung xyz
+    :param R: Rotationsmatrix [3x3]
+
+    :return phi: Eulerwinkel xyz [3x1]
+    :rtype: numpy.list
+    """
+    r11=R[0,0]
+    r12=R[0,1]
+    r13=R[0,2]
+    r21=R[1,0]
+    r22=R[1,1]
+    r23=R[1,2]
+    r31=R[2,0]
+    r32=R[2,1]
+    r33=R[2,2]
+    # Umrechnung Rotationsmatrix in Euler-Winkel xyz
+    t1 = [math.atan2(r21, -r31), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r12, r13)]
+    phi = t1; # Eulerwinkel xyz
+    return np.vstack(phi)
+
+def r2quat(R):
+    """
+    Umwandlung von Rotationsmatrix nach Quaterionen-Darstellung
+    :param R: Rotationsmatrix [3x3]
+
+    :return q: Quaterionen: Erste w (Winkel), dann xyz (Rotationsachsen) [4x1]
+    :rtype: numpy.list
+    """
+    r11=R[0,0]
+    r12=R[0,1]
+    r13=R[0,2]
+    r21=R[1,0]
+    r22=R[1,1]
+    r23=R[1,2]
+    r31=R[2,0]
+    r32=R[2,1]
+    r33=R[2,2]
+    # Umrechnung Rotationsmatrix in Quaterionen-Darstellung
+    tr = r11 + r22 + r33;
+    if (tr > 0): #% analog zu [2], equ. (3.14)
+        S = math.sqrt(tr+1.0) * 2; #% S=4qw
+        qw = 0.25 * S;
+        qx = (r32 - r23) / S;
+        qy = (r13 - r31) / S;
+        qz = (r21 - r12) / S;
+    elif ((r11 > r22) and (r11 > r33)): #% analog zu [2], equ. (3.15)
+        S = math.sqrt(1.0 + r11 - r22 - r33) * 2; #% S=4qx
+        qw = (r32 - r23) / S;
+        qx = 0.25 * S;
+        qy = (r12 + r21) / S;
+        qz = (r13 + r31) / S;
+    elif (r22 > r33): #% analog zu [2], equ. (3.16)
+        S = math.sqrt(1.0 - r11 + r22 - r33) * 2; #% S=4qy
+        qw = (r13 - r31) / S;
+        qx = (r12+ r21) / S;
+        qy = 0.25 * S;
+        qz = (r23 + r32) / S;
+    else: #% analog zu [2], equ. (3.17)
+        S = math.sqrt(1.0 -r11 - r22 + r33) * 2; #% S=4qz
+        qw = (r21 - r12) / S;
+        qx = (r13 + r31) / S;
+        qy = (r23 + r32) / S;
+        qz = 0.25 * S;
+    q = [qw,qx,qy,qz];
+    return np.vstack(q)
+
+
+def r2angvec(R):
+    """
+    Umwandlung von Rotationsmatrix nach Achse-Winkel-Konvention
+    :param R: Rotationsmatrix [3x3]
+
+    :return q: Achse-Winkel-Darstellung der Rotation [theta, n] theta [1x1] und n [3x1]
+    :rtype: , numpy.float, numpy.list
+    """
+    r11=R[0,0]
+    r12=R[0,1]
+    r13=R[0,2]
+    r21=R[1,0]
+    r22=R[1,1]
+    r23=R[1,2]
+    r31=R[2,0]
+    r32=R[2,1]
+    r33=R[2,2]
+
+    #% [Robotik I, Gl. (2.39)]
+    cos_theta = 0.5*(r11+r22+r33-1);
+    if cos_theta == 1:
+        theta = 0;
+        n = [0,0,1];
+    else:
+    #% [Robotik I, Gl. (2.42)]
+        sin_theta = 0.5 * math.sqrt((r32-r23)**2+(r13-r31)**2+(r21-r12)**2);
+        #% [Robotik I, Gl. (2.43)]
+        theta = math.atan2(sin_theta, cos_theta);
+        #% [Robotik I, Gl. (2.44)]
+        x = np.array([(r32 - r23), (r13 - r31), (r21 - r12)])
+        n = 1/(2*sin_theta) * x
+
+    return theta, np.vstack(n)
+
+
 
 
 def direct_kinematics(q):
