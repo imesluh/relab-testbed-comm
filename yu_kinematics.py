@@ -3,6 +3,7 @@ Kinematikfunktionen des Yuanda Yu und kinematik-bezogene mathematische Funktione
 """
 
 import numpy as np
+import math
 
 
 
