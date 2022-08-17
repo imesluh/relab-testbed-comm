@@ -88,7 +88,7 @@ def r2eulxyz(R):
 
 def r2quat(R):
     """
-    Umwandlung von Rotationsmatrix nach Quaterionen-Darstellung
+    Umwandlung von Rotationsmatrix nach Quaternionen-Darstellung
     :param R: Rotationsmatrix [3x3]
 
     :return q: Quaterionen: Erste w (Winkel), dann xyz (Rotationsachsen) [4x1]
@@ -302,7 +302,7 @@ def detect_invalid_angpos(q, workspace, dim):
     :return: Indizes der Achsen, welche den Arbeitsraum verletzen
     :rtype: list
     """
-    X_cart = direct_kinematics(q)[:3, :]
+    X_cart = direct_kinematics(q)[0][:3, :]
     if workspace.lower()=='cartesian':
         ind = np.where((X_cart[0,1:]>dim[0]) | (X_cart[0,1:]<-dim[0]) |
                        (X_cart[1,1:]>dim[1]) | (X_cart[1,1:]<-dim[1]) |
