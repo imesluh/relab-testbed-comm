@@ -7,6 +7,7 @@ import os
 import csv
 
 def connect(address):
+    #global conn, nodes
     conn = Client(address)
     conn.connect()
     nodes = conn.get_objects_node()
@@ -24,7 +25,7 @@ def communicate(nodes, intType, intData, timeout):
     :param nodes: Nodes der OPCUA-Schnittstelle
     :type nodes: OPCUA-Nodes
     :param intType: Zähler bzw. Kanal, welcher Wert geschickt bzw. gelesen wird:
-                    0: Labor (write)
+                    0: Labor (write) (1-4)
                     1: Status (read), WERTE: 0: Ready; 1: Busy; 2: Wert wurde an den Yu gesendet
                     2: Start (write)
                     3: Achszähler (1-6) (write)
@@ -39,6 +40,9 @@ def communicate(nodes, intType, intData, timeout):
     :rtpype: boolean bzw. integer
     """
     try:
+        # print(nodes.get_children()[7].get_children()[1].get_children())
+        # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
+        # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
         if intType==1:
             busy = nodes.get_children()[7].get_children()[1].get_children()[intType].get_value()
             return busy
@@ -55,8 +59,8 @@ def communicate(nodes, intType, intData, timeout):
             nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32)
             # print(nodes.get_children())
             # print(nodes.get_children()[7].get_children())
-            #print(nodes.get_children()[7].get_children()[1].get_children())
-            #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
+            # print(nodes.get_children()[7].get_children()[1].get_children())
+            # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
             #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_methods())
             #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
             # print(nodes.get_children_descriptions)
@@ -71,6 +75,9 @@ def communicate(nodes, intType, intData, timeout):
     except Exception as e:
         raise e
 
+def getStatus(nodes):
+    # nodes.get_children()[7].get_children()[1].get_children()[1].get_value()
+    pass
 def readAxValues(nodes):
     """
     Die Funktion liest die Achswerte aus. Im Gegensatz zum lesen der Werte in communicate() sind diese Werte nicht von
@@ -169,21 +176,31 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
         else:
             return data
 
-def send_ITP(nodes, timeout):
+def send_ITP(nodes, to):
     """
             Initial target post: Yu wird in Home-Position gefahren.
 
             :param nodes: Nodes der OPCUA-Schnittstelle
             :type nodes: OPCUA-Nodes
-            :param timeout: max. Zeit in Sekunden für das Senden
-            :type timeout: float
+            :param to: timeout,max. Zeit in Sekunden für das Senden
+            :type to: float
             """
     # Roboter in Home-Position fahren
     pos_home = [0,-90,90,-90,-90,0]     #  Achswinkel der home position
 
+    communicate(nodes, int(0), int(0), timeout=to)    # Labornummer "0" für Bewegungsvorgabe
     for angle, axes in zip(pos_home, range(len(pos_home))):  # Achswinkel senden
-        communicate(nodes, [3, 4], [axes + 1, angle * 100], timeout)
+        communicate(nodes, [3, 4], [axes + 1, angle * 100], timeout=to)
         time.sleep(0.01)
 
     # Starten der Bewegung
-    communicate(nodes, int(2), 1, timeout)  # Starten der Bewegung
+    communicate(nodes, int(2), 1, timeout=to)  # Starten der Bewegung
+    state = False
+    # warten bis Home-Bewegung durchgeführt
+    start = datetime.datetime.now()
+    while not state:
+        if (datetime.datetime.now() - start).total_seconds() > to:
+            break
+        state = communicate(nodes, int(1), 0, timeout=to)
+        print("%%% moving towards home position..")
+        time.sleep(0.1)

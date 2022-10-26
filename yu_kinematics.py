@@ -367,3 +367,58 @@ def generatePoses(numPos, validPos, workspace, dim, gap):
     inds = np.arange(numPos)
     np.random.shuffle(inds)
     return pose[inds], valid[inds].tolist()
+def geoJacobi(q):
+    """
+    Die Funktion generiert Dir Geometrische Jacobi einer gegeben Gelenkskoordinaten
+
+    :param q: gelenkskoordinaten in grad
+    :type q:  list
+    
+    :return: geometrische Jacobi [6x6] 
+    :rtype: list
+    """
+    xE, T = direct_kinematics(q)
+    e_z_0 = [0, 0, 1]
+    e_z_1 = np.dot(T[0:3, 0: 3, 1], e_z_0)
+    e_z_2 = np.dot(T[0:3, 0: 3, 2], e_z_0)
+    e_z_3 = np.dot(T[0:3, 0: 3, 3], e_z_0)
+    e_z_4 = np.dot(T[0:3, 0: 3, 4], e_z_0)
+    e_z_5 = np.dot(T[0:3, 0: 3, 5], e_z_0)
+    r_0_0 = [0, 0, 0, 1]
+    r_0_E = np.dot(T[:, :, 5], r_0_0) - r_0_0
+    r_1_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 0],r_0_0)
+    r_2_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 1],r_0_0)
+    r_3_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 2],r_0_0)
+    r_4_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 3],r_0_0)
+    r_5_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 4],r_0_0)
+    j_0 = [np.cross(e_z_0, r_0_E[0:3]), e_z_0]
+    j_1 = [np.cross(e_z_1, r_1_E[0:3]), e_z_1]
+    j_2 = [np.cross(e_z_2, r_2_E[0:3]), e_z_2]
+    j_3 = [np.cross(e_z_3, r_3_E[0:3]), e_z_3]
+    j_4 = [np.cross(e_z_4, r_4_E[0:3]), e_z_4]
+    j_5 = [np.cross(e_z_5, r_5_E[0:3]), e_z_5]
+    j_0 = np.reshape(j_0,[6,1])
+    j_1 = np.reshape(j_1,[6,1])
+    j_2 = np.reshape(j_2,[6,1])
+    j_3 = np.reshape(j_3,[6,1])
+    j_4 = np.reshape(j_4,[6,1])
+    j_5 = np.reshape(j_5,[6,1])
+    J_geo = [j_0, j_1, j_2, j_3, j_4, j_5]
+    J_geo = np.reshape(J_geo, [6, 6])
+    J_geo = np.transpose(J_geo)
+    J_geo = J_geo.round(7)
+    return J_geo
+
+
+def iterative_inv_kin(pose,q_start,itr):
+    i = 1
+    while i < itr:
+        pose_ink = direct_kinematics(q_start)[0][:,5]
+        d_x = pose - pose_ink[0:3]
+        j = geoJacobi(q_start)
+        jj = j[0:3,0:3]
+        d_q = np.dot(np.linalg.inv(jj),d_x)
+        q_start[0:3] = q_start[0:3] + d_q
+        i = i+1
+    return q_start
+
