@@ -410,14 +410,29 @@ def geoJacobi(q):
     return J_geo
 
 
-def iterative_inv_kin(pose,q_start,itr):
+def iterative_inv_kin(pose, q_start, itr):
+    """
+    Die Funktion generiert eine Inkrementelle Lösung der Inverse Kinematik bzw der richtigen Position [x, y, z]
+
+    :param pose: Position [x, y, z] in m
+    :type pose:  list
+
+    :param q_start: Startgelenkskoordinaten in rad
+    :type q_start:  list
+
+    :param itr: Iterationszahl
+    :type itr:  int
+
+    :return: Gelenkskoordinaten  [6x1]
+    :rtype: list
+    """
     i = 1
     while i < itr:
-        pose_ink = direct_kinematics(q_start)[0][:,5]
+        pose_ink = direct_kinematics(q_start)[0][:, 5]
         d_x = pose - pose_ink[0:3]
         j = geoJacobi(q_start)
-        jj = j[0:3,0:3]
-        d_q = np.dot(np.linalg.inv(jj),d_x)
+        jj = j[0:3, 0:3]
+        d_q = np.dot(np.linalg.inv(jj), d_x)
         q_start[0:3] = q_start[0:3] + d_q
         i = i+1
     return q_start
