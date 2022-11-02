@@ -40,6 +40,10 @@ def communicate(nodes, intType, intData, timeout):
     :rtpype: boolean bzw. integer
     """
     try:
+        # t = time.localtime()
+        # current_time = time.strftime("%H:%M:%S", t)
+        # if intType != 1:
+        #     print("$$$$ [" + current_time + "]: tbc.communicate(nodes, intType=" + str(intType) + ", intData = " + str(intData) + ")") #debug print
         # print(nodes.get_children()[7].get_children()[1].get_children())
         # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
         # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
@@ -202,5 +206,5 @@ def send_ITP(nodes, to):
         if (datetime.datetime.now() - start).total_seconds() > to:
             break
         state = communicate(nodes, int(1), 0, timeout=to)
-        print("%%% moving towards home position..")
+        print("%%% ITP: moving towards home position..")
         time.sleep(0.1)
