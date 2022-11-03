@@ -6,6 +6,17 @@ import numpy as np
 import math
 
 
+def transRot2T(r,R):
+    """
+    Erstelle homogene Transformationsmatrix [4x4] aus Translation und Rotation
+    """
+    if R.ndim>2:
+        R = R[:,:,0]
+    T = np.zeros((4, 4))
+    T[3, 3] = 1
+    T[0:3, 3] = r
+    T[0:3, 0:3] = R
+    return T
 
 def rad2deg(qs):
     """
@@ -16,10 +27,13 @@ def rad2deg(qs):
 
     :rtype: numpy.array, list
     """
-    i=0
-    for q in qs:
-        qs[i] = q*180/np.pi
-        i+=1
+    try:
+        i=0
+        for q in qs:
+            qs[i] = q*180/np.pi
+            i+=1
+    except:
+        qs = np.float32(qs*180/np.pi)
     return qs
 
 
@@ -83,7 +97,29 @@ def r2eulxyz(R):
     r33=R[2,2]
     # Umrechnung Rotationsmatrix in Euler-Winkel xyz
     t1 = [math.atan2(r21, -r31), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r12, r13)]
-    phi = t1; # Eulerwinkel xyz
+    phi = t1  # Eulerwinkel xyz
+    return np.vstack(phi)
+
+def r2eulzxz(R):
+    """
+    Umwandlung von Rotationsmatrix nach Euler-Darstellung zxz in Rad
+    :param R: Rotationsmatrix [3x3]
+
+    :return phi: Eulerwinkel zxz in rad[3x1]
+    :rtype: numpy.list
+    """
+    r11=R[0,0]
+    r12=R[0,1]
+    r13=R[0,2]
+    r21=R[1,0]
+    r22=R[1,1]
+    r23=R[1,2]
+    r31=R[2,0]
+    r32=R[2,1]
+    r33=R[2,2]
+    # Umrechnung Rotationsmatrix in Euler-Winkel
+    t1 = [math.atan2(r23, r13), math.atan2(math.sqrt(r31 ** 2 + r32 ** 2), r33), math.atan2(r32, -r31)]
+    phi = t1
     return np.vstack(phi)
 
 def r2eulxzx(R):
@@ -104,8 +140,32 @@ def r2eulxzx(R):
     r33=R[2,2]
     # Umrechnung Rotationsmatrix in Euler-Winkel xzx
     t1 = [math.atan2(r31, r21), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r13, -r12)]
-    phi = t1; # Eulerwinkel xzx
+    phi = t1  # Eulerwinkel xzx
     return np.vstack(phi)
+
+def eulzxz2r(phi):
+    """
+    Umwandlung von Euler-Darstellung xyz zu Rotationsmatrix
+    :param: phi: Eulerwinkel zxz in rad [3x1]
+    :return R: Rotationsmatrix [3x3]
+    :rtype: numpy.array
+    """
+    phi1 = phi[0]
+    phi2 = phi[1]
+    phi3 = phi[2]
+    t89 =  math.sin(phi1)
+    t91 =  math.cos(phi2)
+    t95 = t89 * t91
+    t87 =  math.sin(phi3)
+    t92 =  math.cos(phi1)
+    t94 = t92 * t87
+    t90 = math.cos(phi3)
+    t93 = t92 * t90
+    t88 =  math.sin(phi2)
+    r = np.array([ [-t87 * t95 + t93, -t90 * t95 - t94, t89 * t88],
+                    [t89 * t90 + t91 * t94, -t89 * t87 + t91 * t93, -t92 * t88],
+                    [t88 * t87, t88 * t90, t91]])
+    return r
 
 def eulxyz2r(phi):
     """
@@ -114,13 +174,13 @@ def eulxyz2r(phi):
     :return R: Rotationsmatrix [3x3]
     :rtype: numpy.array
     """
-    phi1 = phi(1)
-    phi2 = phi(2)
-    phi3 = phi(3)
+    phi1 = phi[0]
+    phi2 = phi[1]
+    phi3 = phi[2]
     t10 = math.sin(phi3)
     t12 = math.sin(phi1)
     t19 = t12 * t10
-    t13 = math.cos((phi3)
+    t13 = math.cos(phi3)
     t18 = t12 * t13
     t15 = math.cos(phi1)
     t17 = t15 * t10
@@ -139,9 +199,9 @@ def eulxzx2r(phi):
     :return R: Rotationsmatrix [3x3]
     :rtype: numpy.array
     """
-    phi1 = phi(1)
-    phi2 = phi(2)
-    phi3 = phi(3)
+    phi1 = phi[0]
+    phi2 = phi[1]
+    phi3 = phi[2]
     t22 = math.sin(phi1)
     t24 = math.cos(phi2)
     t28 = t22 * t24
@@ -164,6 +224,8 @@ def r2quat(R):
     :return q: Quaterionen: Erste w (Winkel), dann xyz (Rotationsachsen) [4x1]
     :rtype: numpy.list
     """
+    # transponieren, damit uebereinstimmend mit Robotik-Skript und Stanford-Paper
+    R = R.transpose()
     r11=R[0,0]
     r12=R[0,1]
     r13=R[0,2]
@@ -174,32 +236,32 @@ def r2quat(R):
     r32=R[2,1]
     r33=R[2,2]
     # Umrechnung Rotationsmatrix in Quaterionen-Darstellung
-    tr = r11 + r22 + r33;
+    tr = r11 + r22 + r33
     if (tr > 0): #% analog zu [2], equ. (3.14)
-        S = math.sqrt(tr+1.0) * 2; #% S=4qw
-        qw = 0.25 * S;
-        qx = (r32 - r23) / S;
-        qy = (r13 - r31) / S;
-        qz = (r21 - r12) / S;
+        S = math.sqrt(tr+1.0) * 2  #% S=4qw
+        qw = 0.25 * S
+        qx = (r32 - r23) / S
+        qy = (r13 - r31) / S
+        qz = (r21 - r12) / S
     elif ((r11 > r22) and (r11 > r33)): #% analog zu [2], equ. (3.15)
-        S = math.sqrt(1.0 + r11 - r22 - r33) * 2; #% S=4qx
-        qw = (r32 - r23) / S;
-        qx = 0.25 * S;
-        qy = (r12 + r21) / S;
-        qz = (r13 + r31) / S;
+        S = math.sqrt(1.0 + r11 - r22 - r33) * 2  #% S=4qx
+        qw = (r32 - r23) / S
+        qx = 0.25 * S
+        qy = (r12 + r21) / S
+        qz = (r13 + r31) / S
     elif (r22 > r33): #% analog zu [2], equ. (3.16)
-        S = math.sqrt(1.0 - r11 + r22 - r33) * 2; #% S=4qy
-        qw = (r13 - r31) / S;
-        qx = (r12+ r21) / S;
-        qy = 0.25 * S;
-        qz = (r23 + r32) / S;
+        S = math.sqrt(1.0 - r11 + r22 - r33) * 2  #% S=4qy
+        qw = (r13 - r31) / S
+        qx = (r12+ r21) / S
+        qy = 0.25 * S
+        qz = (r23 + r32) / S
     else: #% analog zu [2], equ. (3.17)
-        S = math.sqrt(1.0 -r11 - r22 + r33) * 2; #% S=4qz
-        qw = (r21 - r12) / S;
-        qx = (r13 + r31) / S;
-        qy = (r23 + r32) / S;
-        qz = 0.25 * S;
-    q = [qw,qx,qy,qz];
+        S = math.sqrt(1.0 -r11 - r22 + r33) * 2  #% S=4qz
+        qw = (r21 - r12) / S
+        qx = (r13 + r31) / S
+        qy = (r23 + r32) / S
+        qz = 0.25 * S
+    q = np.array([qw,qx,qy,qz])
     return np.vstack(q)
 
 
@@ -222,20 +284,20 @@ def r2angvec(R):
     r33=R[2,2]
 
     #% [Robotik I, Gl. (2.39)]
-    cos_theta = 0.5*(r11+r22+r33-1);
+    cos_theta = 0.5*(r11+r22+r33-1)
     if cos_theta == 1:
-        theta = 0;
-        n = [0,0,1];
+        theta = 0
+        n = [0,0,1]
     else:
     #% [Robotik I, Gl. (2.42)]
-        sin_theta = 0.5 * math.sqrt((r32-r23)**2+(r13-r31)**2+(r21-r12)**2);
+        sin_theta = 0.5 * math.sqrt((r32-r23)**2+(r13-r31)**2+(r21-r12)**2)
         #% [Robotik I, Gl. (2.43)]
-        theta = math.atan2(sin_theta, cos_theta);
+        theta = math.atan2(sin_theta, cos_theta)
         #% [Robotik I, Gl. (2.44)]
         x = np.array([(r32 - r23), (r13 - r31), (r21 - r12)])
         n = 1/(2*sin_theta) * x
 
-    return theta, np.vstack(n)
+    return theta, n#np.vstack(n)
 
 
 def angvec2r(u, theta):
@@ -274,6 +336,7 @@ def angvec2r(u, theta):
 def quat2r(quat):
     """
     Rotationsmatrix aus Quaterionen-Darstellung berechnen
+    Quelle: Skript Robotik 1 WiSe 22/23
 
     Eingabe:
         Quaterionenvektor quat [1x4]
@@ -296,7 +359,10 @@ def quat2r(quat):
     R_q = np.array([[a ** 2 + b ** 2 - c ** 2 - d ** 2, 2 * b * c - 2 * a * d, 2 * b * d + 2 * a * c],
                     [2 * b * c + 2 * a * d, a ** 2 - b ** 2 + c ** 2 - d ** 2, 2 * c * d - 2 * a * b],
                     [2 * b * d - 2 * a * c, 2 * c * d + 2 * a * b, a ** 2 - b ** 2 - c ** 2 + d ** 2]])
-
+    if R_q.ndim > 2:
+        R_q = R_q[:,:,0]
+    # Transponierte bilden, damit mit Robotik-Skript (und Stanford-Paper uebereinstimmt)
+    R_q = R_q.transpose()
     return R_q
 
 
