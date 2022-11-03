@@ -33,7 +33,7 @@ def rad2deg(qs):
             qs[i] = q*180/np.pi
             i+=1
     except:
-        qs = np.float32(qs*180/np.pi)
+        qs = np.float64(qs*180/np.pi)
     return qs
 
 
@@ -142,6 +142,29 @@ def r2eulxzx(R):
     t1 = [math.atan2(r31, r21), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r13, -r12)]
     phi = t1  # Eulerwinkel xzx
     return np.vstack(phi)
+
+def rpy2r(phi):
+    """
+    Umwandlung von RPY-Darstellung zu Rotationsmatrix
+    :param: phi: RPY in rad [3x1]
+    :return R: Rotationsmatrix [3x3]
+    :rtype: numpy.array
+    """
+    alpha = phi[0]      #yaw
+    beta = phi[1]       #pitch
+    gamma = phi[2]      #roll
+
+    ca = math.cos(alpha)
+    sa = math.sin(alpha)
+    cb = math.cos(beta)
+    sb = math.sin(beta)
+    cc = math.cos(gamma)
+    sc = math.sin(gamma)
+
+    r = np.array([  [cg * cb, cg*sb*sa-sg*ca, cg*sb*ca+sg*sa],
+                    [sg*cb, sg*sb*sa+cg*ca, sg*sb*ca-cg*sa],
+                    [-sb, cb*sa, cb*ca]])
+    return r
 
 def eulzxz2r(phi):
     """
