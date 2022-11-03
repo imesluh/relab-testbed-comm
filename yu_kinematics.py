@@ -69,7 +69,7 @@ def r2eulxyz(R):
     Umwandlung von Rotationsmatrix nach Euler-Darstellung xyz
     :param R: Rotationsmatrix [3x3]
 
-    :return phi: Eulerwinkel xyz [3x1]
+    :return phi: Eulerwinkel xyz in rad[3x1]
     :rtype: numpy.list
     """
     r11=R[0,0]
@@ -85,6 +85,76 @@ def r2eulxyz(R):
     t1 = [math.atan2(r21, -r31), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r12, r13)]
     phi = t1; # Eulerwinkel xyz
     return np.vstack(phi)
+
+def r2eulxzx(R):
+    """
+    Umwandlung von Rotationsmatrix nach Euler-Darstellung xzx in rad
+    :param R: Rotationsmatrix [3x3]
+    :return phi: Eulerwinkel xyz in rad[3x1]
+    :rtype: numpy.list
+    """
+    r11=R[0,0]
+    r12=R[0,1]
+    r13=R[0,2]
+    r21=R[1,0]
+    r22=R[1,1]
+    r23=R[1,2]
+    r31=R[2,0]
+    r32=R[2,1]
+    r33=R[2,2]
+    # Umrechnung Rotationsmatrix in Euler-Winkel xzx
+    t1 = [math.atan2(r31, r21), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r13, -r12)]
+    phi = t1; # Eulerwinkel xzx
+    return np.vstack(phi)
+
+def eulxyz2r(phi):
+    """
+    Umwandlung von Euler-Darstellung xyz zu Rotationsmatrix
+    :param: phi: Eulerwinkel xyz in rad [3x1]
+    :return R: Rotationsmatrix [3x3]
+    :rtype: numpy.array
+    """
+    phi1 = phi(1)
+    phi2 = phi(2)
+    phi3 = phi(3)
+    t10 = math.sin(phi3)
+    t12 = math.sin(phi1)
+    t19 = t12 * t10
+    t13 = math.cos((phi3)
+    t18 = t12 * t13
+    t15 = math.cos(phi1)
+    t17 = t15 * t10
+    t16 = t15 * t13
+    t14 = math.cos(phi2)
+    t11 = math.sin(phi2)
+    r = np.array([ [t14 * t13, -t14 * t10, t11],
+                    [t11 * t18 + t17, -t11 * t19 + t16, -t12 * t14],
+                    [-t11 * t16 + t19, t11 * t17 + t18, t15 * t14]])
+    return r
+
+def eulxzx2r(phi):
+    """
+    Umwandlung von Euler-Darstellung xzx zu Rotationsmatrix
+    :param: phi: Eulerwinkel xzx in rad [3x1]
+    :return R: Rotationsmatrix [3x3]
+    :rtype: numpy.array
+    """
+    phi1 = phi(1)
+    phi2 = phi(2)
+    phi3 = phi(3)
+    t22 = math.sin(phi1)
+    t24 = math.cos(phi2)
+    t28 = t22 * t24
+    t20 = math.sin(phi3)
+    t25 = math.cos(phi1)
+    t27 = t25 * t20
+    t23 = math.cos(phi3)
+    t26 = t25 * t23
+    t21 = math.sin(phi2)
+    r = np.array([ [t24, -t21 * t23, t21 * t20],
+                    [t25 * t21, -t22 * t20 + t24 * t26, -t22 * t23 - t24 * t27],
+                    [t22 * t21, t23 * t28 + t27, -t20 * t28 + t26]])
+    return r
 
 def r2quat(R):
     """
