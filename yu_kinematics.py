@@ -96,7 +96,8 @@ def r2eulxyz(R):
     r32=R[2,1]
     r33=R[2,2]
     # Umrechnung Rotationsmatrix in Euler-Winkel xyz
-    t1 = [math.atan2(r21, -r31), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r12, r13)]
+    # t1 = [math.atan2(r21, -r31), math.atan2(math.sqrt(r21 ** 2 + r31 ** 2), r11), math.atan2(r12, r13)] # alt
+    t1 = [math.atan2(-r23, r33), math.atan2(r13, math.sqrt(r23 ** 2 + r33 ** 2)), math.atan2(-r12, r11)]
     phi = t1  # Eulerwinkel xyz
     return np.vstack(phi)
 
