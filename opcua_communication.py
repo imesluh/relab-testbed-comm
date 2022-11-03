@@ -15,6 +15,7 @@ def connect(address):
 
 def disconnect(conn):
     conn.disconnect()
+    print("Disconnected OPCUA communication.")
 
 
 def communicate(nodes, intType, intData, timeout):
