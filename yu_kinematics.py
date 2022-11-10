@@ -169,7 +169,7 @@ def rpy2r(phi):
 
 def eulzxz2r(phi):
     """
-    Umwandlung von Euler-Darstellung xyz zu Rotationsmatrix
+    Umwandlung von Euler-Darstellung zxz zu Rotationsmatrix
     :param: phi: Eulerwinkel zxz in rad [3x1]
     :return R: Rotationsmatrix [3x3]
     :rtype: numpy.array
