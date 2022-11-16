@@ -6,6 +6,224 @@ import numpy as np
 import math
 
 
+### global variables
+# Achswinkelgrenzen in Grad. Diese müssen zu den Angaben in der Yu-Steuerung passen!
+q_lim_yu = np.array([[-220, 220],
+                      [-190, 10],
+                      [-160, 160],
+                      [-310, 130],
+                      [-220, 220],
+                      [-220, 220]])      # Stand 2022-11-16
+q_lim = np.array([[-180, 180],
+                      [-180, 10],
+                      [-130, 130],
+                      [-180, 130],
+                      [-92, 0],
+                      [0, 0]])          # dieses Array wird zur Ueberpruefung gueltiger Posen verwendet
+
+
+##### kinematic functions Yuanda Yu
+def direct_kinematics(q):
+    """
+    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
+    in Kardanwinkel-Notation.
+
+    :param q: 6 Gelenkwinkel des Yu in rad
+    :type q:  numpy.array, list
+
+    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
+             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
+    :rtype: numpy.array, numpy.array
+    """
+    l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290]) # Längen des Yu
+    DHP=np.array([[q[0],      l[0],       0,      -np.pi/2],
+                  [q[1],      l[1],       l[2],    0],
+                  [q[2],     -l[3],       l[4],    0],
+                  [q[3],     -l[5],       0,       np.pi/2],
+                  [q[4],     -l[6],       0,      -np.pi/2],
+                  [q[5],     -l[7],       0,       np.pi]]) # DH-Parameter des Yu
+
+    #Initialisierung und Berechnung der Denavit-Hartenberg-Matrizen
+    A=np.zeros(shape=(4,4,6))
+    for u in range(6):
+        A[:,:,u]=np.array([[np.cos(DHP[u,0]),   -np.sin(DHP[u,0])*np.cos(DHP[u,3]),   np.sin(DHP[u,0])*np.sin(DHP[u,3]),    DHP[u,2]*np.cos(DHP[u,0])],
+                           [np.sin(DHP[u,0]),   np.cos(DHP[u,0])*np.cos(DHP[u,3]),    -np.cos(DHP[u,0])*np.sin(DHP[u,3]),   DHP[u,2]*np.sin(DHP[u,0])],
+                           [0,               np.sin(DHP[u,3]),                  np.cos(DHP[u,3]),                  DHP[u,1]],
+                           [0,               0,                              0,                              1]])
+
+    #Berechnung der Transformationsmatrizen
+    T = np.zeros(shape=(4,4,6))
+    T[:,:,0]=A[:,:,0]
+    T[:,:,1]=np.linalg.multi_dot((A[:,:,0],A[:,:,1]))
+    T[:,:,2]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2]))
+    T[:,:,3]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3]))
+    T[:,:,4]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4]))
+    T[:,:,5]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4],A[:,:,5])) # 4x4 Trafo
+
+    #Initialisierung der Positionsmatrix und Orientierungsmatrix
+    Position=np.zeros(shape=(3,6))
+    Orientierung=np.zeros(shape=(3,6))
+
+
+    #Berechnung von Position und Orientierung der einzelnen Koordinatensysteme
+    for u in range(6):
+        Position[:,u]=T[:3,3,u]
+
+        #Berechnung der Orientierung (in Kardanwinkeln)
+        alpha=np.arctan2(-T[1,2,u],T[2,2,u])
+        gamma=np.arctan2(-T[0,1,u],T[0,0,u])
+        beta=np.arctan2(T[0,2,u],T[0,0,u]*np.cos(gamma)-T[0,1,u]*np.sin(gamma))
+        Orientierung[:,u]=[alpha,beta,gamma]
+
+
+    #Rückgabe der Orientierung in 6-FHG
+    # TODO: Rueckgabe trennen in Pos+Orientierung?
+    return np.vstack((Position,Orientierung)), T
+
+def detect_invalid_angpos(q, workspace, dim):
+    """
+    Die Funktion ermittelt welche Achsen den Arbeitsraum (kartesisch oder zylindrisch) verletzen.
+
+    :param q: 6 Gelenkwinkel des Yu in rad (ein Gelenkwinkel pro Zeile bei mehreren Positionen)
+    :type q:  numpy.array, list
+    :param workspace: Art des Arbeitsraumes ('cartesian', 'cylindric')
+    :type workspace:  string
+    :param dim: Ausdehnung des Arbeitsraumes (x,y,z für 'cartesian' und r,h für 'cylindric'). Die y- und y-Werte für den
+                kartesischen Arbeitsraum werden positiv und negativ berücksichtigt, der z-Wert rein positiv.
+    :type dim: numpy.array, list
+
+    :return: Indizes der Achsen, welche den Arbeitsraum verletzen
+    :rtype: list
+    """
+    X_cart = direct_kinematics(q)[0][:3, :]
+    if workspace.lower()=='cartesian':
+        ind = np.where((X_cart[0,1:]>dim[0]) | (X_cart[0,1:]<-dim[0]) |
+                       (X_cart[1,1:]>dim[1]) | (X_cart[1,1:]<-dim[1]) |
+                       (X_cart[2,1:]>dim[2]) | (X_cart[2,1:]<0.2))
+    elif workspace.lower()=='cylindric':
+        ind = np.where(((X_cart[0, 1:] ** 2 + X_cart[1, 1:] ** 2) > dim[0] ** 2) |
+                       (X_cart[2, 1:] > dim[1]) | (X_cart[2, 1:] < 0.2))[0]
+    ind = [x + 1 for x in ind]
+    return ind
+
+def generatePoses(numPos, validPos, workspace, dim, gap):
+    """
+    Die Funktion generiert eine gewählte Anzahl von Positionen innerhalb sowie außerhalb des Arbeitsraumes
+
+    :param numPos: Anzahl an Positionen
+    :type numPos:  integer
+    :param validPos: Anzahl an Positionen innerhalb des Arbeitsraumens
+    :type validPos:  integer
+    :param workspace: Art des Arbeitsraumes ('cartesian', 'cylindric')
+    :type workspace: string
+    :param dim: Ausdehnung des Arbeitsraumes (x,y,z für 'cartesian' und r,h für 'cylindric'). Die y- und y-Werte für den
+                kartesischen Arbeitsraum werden positiv und negativ berücksichtigt, der z-Wert rein positiv.
+    :type dim: numpy.array, list
+    :param gap: Toleranzband um die Arbeitsraumgrenze
+    :type gap: float
+
+    :return: Positionen in Grad
+    :rtype: list
+    :return: Position valide oder invalide
+    :rtype: list of boolean
+    """
+    samples=100
+
+    pose = []
+    valid= []
+    validC = 0
+    invalidC = 0
+    while validC+invalidC<numPos:
+        qs = deg2rad(np.random.uniform(q_lim[:, 0], q_lim[:, 1], (samples, 6)))
+        for q in qs:
+            ind = detect_invalid_angpos(q, workspace, [x-gap for x in dim])
+            if len(ind)==0 and validC<validPos:
+                pose.append(rad2deg(q))
+                valid.append(1)
+                validC+=1
+            else:
+                ind = detect_invalid_angpos(q, workspace, [x+gap for x in dim])
+                if len(ind)>0 and invalidC<numPos-validPos:
+                    pose.append(rad2deg(q))
+                    valid.append(0)
+                    invalidC+=1
+                elif validC+invalidC == numPos:
+                    break
+    pose = np.vstack(pose)
+    valid = np.array(valid)
+    inds = np.arange(numPos)
+    np.random.shuffle(inds)
+    return pose[inds], valid[inds].tolist()
+def geoJacobi(q):
+    """
+    Die Funktion generiert Dir Geometrische Jacobi einer gegeben Gelenkskoordinaten
+
+    :param q: gelenkskoordinaten in grad
+    :type q:  list
+    
+    :return: geometrische Jacobi [6x6] 
+    :rtype: list
+    """
+    xE, T = direct_kinematics(q)
+    e_z_0 = [0, 0, 1]
+    e_z_1 = np.dot(T[0:3, 0: 3, 1], e_z_0)
+    e_z_2 = np.dot(T[0:3, 0: 3, 2], e_z_0)
+    e_z_3 = np.dot(T[0:3, 0: 3, 3], e_z_0)
+    e_z_4 = np.dot(T[0:3, 0: 3, 4], e_z_0)
+    e_z_5 = np.dot(T[0:3, 0: 3, 5], e_z_0)
+    r_0_0 = [0, 0, 0, 1]
+    r_0_E = np.dot(T[:, :, 5], r_0_0) - r_0_0
+    r_1_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 0],r_0_0)
+    r_2_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 1],r_0_0)
+    r_3_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 2],r_0_0)
+    r_4_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 3],r_0_0)
+    r_5_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 4],r_0_0)
+    j_0 = [np.cross(e_z_0, r_0_E[0:3]), e_z_0]
+    j_1 = [np.cross(e_z_1, r_1_E[0:3]), e_z_1]
+    j_2 = [np.cross(e_z_2, r_2_E[0:3]), e_z_2]
+    j_3 = [np.cross(e_z_3, r_3_E[0:3]), e_z_3]
+    j_4 = [np.cross(e_z_4, r_4_E[0:3]), e_z_4]
+    j_5 = [np.cross(e_z_5, r_5_E[0:3]), e_z_5]
+    j_0 = np.reshape(j_0,[6,1])
+    j_1 = np.reshape(j_1,[6,1])
+    j_2 = np.reshape(j_2,[6,1])
+    j_3 = np.reshape(j_3,[6,1])
+    j_4 = np.reshape(j_4,[6,1])
+    j_5 = np.reshape(j_5,[6,1])
+    J_geo = [j_0, j_1, j_2, j_3, j_4, j_5]
+    J_geo = np.reshape(J_geo, [6, 6])
+    J_geo = np.transpose(J_geo)
+    J_geo = J_geo.round(7)
+    return J_geo
+
+def iterative_inv_kin(pose, q_start, itr):
+    """
+    Die Funktion generiert eine Inkrementelle Lösung der Inverse Kinematik bzw der richtigen Position [x, y, z]
+
+    :param pose: Position [x, y, z] in m
+    :type pose:  list
+
+    :param q_start: Startgelenkskoordinaten in rad
+    :type q_start:  list
+
+    :param itr: Iterationszahl
+    :type itr:  int
+
+    :return: Gelenkskoordinaten  [6x1]
+    :rtype: list
+    """
+    i = 1
+    while i < itr:
+        pose_ink = direct_kinematics(q_start)[0][:, 5]
+        d_x = pose - pose_ink[0:3]
+        j = geoJacobi(q_start)
+        jj = j[0:3, 0:3]
+        d_q = np.dot(np.linalg.inv(jj), d_x)
+        q_start[0:3] = q_start[0:3] + d_q
+        i = i+1
+    return q_start
+
+#### Transformation functions and unit conversions
 def transRot2T(r,R):
     """
     Erstelle homogene Transformationsmatrix [4x4] aus Translation und Rotation
@@ -36,7 +254,6 @@ def rad2deg(qs):
         qs = np.float64(qs*180/np.pi)
     return qs
 
-
 def deg2rad(qs):
     """
         Die Funktion rechnet die Gelenkwinkel in ° in rad um.
@@ -51,7 +268,6 @@ def deg2rad(qs):
         qs[i] = q * np.pi/180
         i += 1
     return qs
-
 
 def Rx(theta):
     """
@@ -288,7 +504,6 @@ def r2quat(R):
     q = np.array([qw,qx,qy,qz])
     return np.vstack(q)
 
-
 def r2angvec(R):
     """
     Umwandlung von Rotationsmatrix nach Achse-Winkel-Konvention
@@ -323,7 +538,6 @@ def r2angvec(R):
 
     return theta, n#np.vstack(n)
 
-
 def angvec2r(u, theta):
     """
     Rotationsmatrix aus Achse-Winkel-Darstellung berechnen
@@ -356,7 +570,6 @@ def angvec2r(u, theta):
                     [ux * uz * vth - uy * sth, uy * uz * vth + ux * sth, uz ** 2 * vth + cth]])
     return R_u
 
-
 def quat2r(quat):
     """
     Rotationsmatrix aus Quaterionen-Darstellung berechnen
@@ -388,212 +601,3 @@ def quat2r(quat):
     # Transponierte bilden, damit mit Robotik-Skript (und Stanford-Paper uebereinstimmt)
     R_q = R_q.transpose()
     return R_q
-
-
-def direct_kinematics(q):
-    """
-    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
-    in Kardanwinkel-Notation.
-
-    :param q: 6 Gelenkwinkel des Yu in rad
-    :type q:  numpy.array, list
-
-    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
-             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
-    :rtype: numpy.array, numpy.array
-    """
-    l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290]) # Längen des Yu
-    DHP=np.array([[q[0],      l[0],       0,      -np.pi/2],
-                  [q[1],      l[1],       l[2],    0],
-                  [q[2],     -l[3],       l[4],    0],
-                  [q[3],     -l[5],       0,       np.pi/2],
-                  [q[4],     -l[6],       0,      -np.pi/2],
-                  [q[5],     -l[7],       0,       np.pi]]) # DH-Parameter des Yu
-
-    #Initialisierung und Berechnung der Denavit-Hartenberg-Matrizen
-    A=np.zeros(shape=(4,4,6))
-    for u in range(6):
-        A[:,:,u]=np.array([[np.cos(DHP[u,0]),   -np.sin(DHP[u,0])*np.cos(DHP[u,3]),   np.sin(DHP[u,0])*np.sin(DHP[u,3]),    DHP[u,2]*np.cos(DHP[u,0])],
-                           [np.sin(DHP[u,0]),   np.cos(DHP[u,0])*np.cos(DHP[u,3]),    -np.cos(DHP[u,0])*np.sin(DHP[u,3]),   DHP[u,2]*np.sin(DHP[u,0])],
-                           [0,               np.sin(DHP[u,3]),                  np.cos(DHP[u,3]),                  DHP[u,1]],
-                           [0,               0,                              0,                              1]])
-
-    #Berechnung der Transformationsmatrizen
-    T = np.zeros(shape=(4,4,6))
-    T[:,:,0]=A[:,:,0]
-    T[:,:,1]=np.linalg.multi_dot((A[:,:,0],A[:,:,1]))
-    T[:,:,2]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2]))
-    T[:,:,3]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3]))
-    T[:,:,4]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4]))
-    T[:,:,5]=np.linalg.multi_dot((A[:,:,0],A[:,:,1],A[:,:,2],A[:,:,3],A[:,:,4],A[:,:,5])) # 4x4 Trafo
-
-    #Initialisierung der Positionsmatrix und Orientierungsmatrix
-    Position=np.zeros(shape=(3,6))
-    Orientierung=np.zeros(shape=(3,6))
-
-
-    #Berechnung von Position und Orientierung der einzelnen Koordinatensysteme
-    for u in range(6):
-        Position[:,u]=T[:3,3,u]
-
-        #Berechnung der Orientierung (in Kardanwinkeln)
-        alpha=np.arctan2(-T[1,2,u],T[2,2,u])
-        gamma=np.arctan2(-T[0,1,u],T[0,0,u])
-        beta=np.arctan2(T[0,2,u],T[0,0,u]*np.cos(gamma)-T[0,1,u]*np.sin(gamma))
-        Orientierung[:,u]=[alpha,beta,gamma]
-
-
-    #Rückgabe der Orientierung in 6-FHG
-    # TODO: Rueckgabe trennen in Pos+Orientierung?
-    return np.vstack((Position,Orientierung)), T
-
-def detect_invalid_angpos(q, workspace, dim):
-    """
-    Die Funktion ermittelt welche Achsen den Arbeitsraum (kartesisch oder zylindrisch) verletzen.
-
-    :param q: 6 Gelenkwinkel des Yu in rad (ein Gelenkwinkel pro Zeile bei mehreren Positionen)
-    :type q:  numpy.array, list
-    :param workspace: Art des Arbeitsraumes
-    :type workspace:  'cartesian', 'cylindric'
-    :param dim: Ausdehnung des Arbeitsraumes (x,y,z für 'cartesian' und r,h für 'cylindric'). Die y- und y-Werte für den
-                kartesischen Arbeitsraum werden positiv und negativ berücksichtigt, der z-Wert rein positiv.
-    :type dim: numpy.array, list
-
-    :return: Indizes der Achsen, welche den Arbeitsraum verletzen
-    :rtype: list
-    """
-    X_cart = direct_kinematics(q)[0][:3, :]
-    if workspace.lower()=='cartesian':
-        ind = np.where((X_cart[0,1:]>dim[0]) | (X_cart[0,1:]<-dim[0]) |
-                       (X_cart[1,1:]>dim[1]) | (X_cart[1,1:]<-dim[1]) |
-                       (X_cart[2,1:]>dim[2]) | (X_cart[2,1:]<0.2))
-    elif workspace.lower()=='cylindric':
-        ind = np.where(((X_cart[0, 1:] ** 2 + X_cart[1, 1:] ** 2) > dim[0] ** 2) |
-                       (X_cart[2, 1:] > dim[1]) | (X_cart[2, 1:] < 0.2))[0]
-    ind = [x + 1 for x in ind]
-    return ind
-
-
-def generatePoses(numPos, validPos, workspace, dim, gap):
-    """
-    Die Funktion generiert eine gewählte Anzahl von Positionen innerhalb sowie außerhalb des Arbeitsraumes
-
-    :param numPos: Anzahl an Positionen
-    :type numPos:  integer
-    :param validPos: Anzahl an Positionen innerhalb des Arbeitsraumens
-    :type validPos:  integer
-    :param workspace: Art des Arbeitsraumes
-    :type workspace:  'cartesian', 'cylindric'
-    :param dim: Ausdehnung des Arbeitsraumes (x,y,z für 'cartesian' und r,h für 'cylindric'). Die y- und y-Werte für den
-                kartesischen Arbeitsraum werden positiv und negativ berücksichtigt, der z-Wert rein positiv.
-    :type dim: numpy.array, list
-    :param gap: Toleranzband um die Arbeitsraumgrenze
-    :type gap: flat
-
-    :return: Positionen in Grad
-    :rtype: list
-    :return: Position valide oder invalide
-    :rtype: list of boolean
-    """
-    samples=100
-    q_lim = np.array([[-180, 180],
-                      [-180, 10],
-                      [-130, 130],
-                      [-180, 130],
-                      [-92, 0],
-                      [0, 0]])
-    pose = []
-    valid= []
-    validC = 0
-    invalidC = 0
-    while validC+invalidC<numPos:
-        qs = deg2rad(np.random.uniform(q_lim[:, 0], q_lim[:, 1], (samples, 6)))
-        for q in qs:
-            ind = detect_invalid_angpos(q, workspace, [x-gap for x in dim])
-            if len(ind)==0 and validC<validPos:
-                pose.append(rad2deg(q))
-                valid.append(1)
-                validC+=1
-            else:
-                ind = detect_invalid_angpos(q, workspace, [x+gap for x in dim])
-                if len(ind)>0 and invalidC<numPos-validPos:
-                    pose.append(rad2deg(q))
-                    valid.append(0)
-                    invalidC+=1
-                elif validC+invalidC == numPos:
-                    break
-    pose = np.vstack(pose)
-    valid = np.array(valid)
-    inds = np.arange(numPos)
-    np.random.shuffle(inds)
-    return pose[inds], valid[inds].tolist()
-def geoJacobi(q):
-    """
-    Die Funktion generiert Dir Geometrische Jacobi einer gegeben Gelenkskoordinaten
-
-    :param q: gelenkskoordinaten in grad
-    :type q:  list
-    
-    :return: geometrische Jacobi [6x6] 
-    :rtype: list
-    """
-    xE, T = direct_kinematics(q)
-    e_z_0 = [0, 0, 1]
-    e_z_1 = np.dot(T[0:3, 0: 3, 1], e_z_0)
-    e_z_2 = np.dot(T[0:3, 0: 3, 2], e_z_0)
-    e_z_3 = np.dot(T[0:3, 0: 3, 3], e_z_0)
-    e_z_4 = np.dot(T[0:3, 0: 3, 4], e_z_0)
-    e_z_5 = np.dot(T[0:3, 0: 3, 5], e_z_0)
-    r_0_0 = [0, 0, 0, 1]
-    r_0_E = np.dot(T[:, :, 5], r_0_0) - r_0_0
-    r_1_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 0],r_0_0)
-    r_2_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 1],r_0_0)
-    r_3_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 2],r_0_0)
-    r_4_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 3],r_0_0)
-    r_5_E = np.dot(T[:, :, 5], r_0_0) - np.dot(T[:, :, 4],r_0_0)
-    j_0 = [np.cross(e_z_0, r_0_E[0:3]), e_z_0]
-    j_1 = [np.cross(e_z_1, r_1_E[0:3]), e_z_1]
-    j_2 = [np.cross(e_z_2, r_2_E[0:3]), e_z_2]
-    j_3 = [np.cross(e_z_3, r_3_E[0:3]), e_z_3]
-    j_4 = [np.cross(e_z_4, r_4_E[0:3]), e_z_4]
-    j_5 = [np.cross(e_z_5, r_5_E[0:3]), e_z_5]
-    j_0 = np.reshape(j_0,[6,1])
-    j_1 = np.reshape(j_1,[6,1])
-    j_2 = np.reshape(j_2,[6,1])
-    j_3 = np.reshape(j_3,[6,1])
-    j_4 = np.reshape(j_4,[6,1])
-    j_5 = np.reshape(j_5,[6,1])
-    J_geo = [j_0, j_1, j_2, j_3, j_4, j_5]
-    J_geo = np.reshape(J_geo, [6, 6])
-    J_geo = np.transpose(J_geo)
-    J_geo = J_geo.round(7)
-    return J_geo
-
-
-def iterative_inv_kin(pose, q_start, itr):
-    """
-    Die Funktion generiert eine Inkrementelle Lösung der Inverse Kinematik bzw der richtigen Position [x, y, z]
-
-    :param pose: Position [x, y, z] in m
-    :type pose:  list
-
-    :param q_start: Startgelenkskoordinaten in rad
-    :type q_start:  list
-
-    :param itr: Iterationszahl
-    :type itr:  int
-
-    :return: Gelenkskoordinaten  [6x1]
-    :rtype: list
-    """
-    i = 1
-    while i < itr:
-        pose_ink = direct_kinematics(q_start)[0][:, 5]
-        d_x = pose - pose_ink[0:3]
-        j = geoJacobi(q_start)
-        jj = j[0:3, 0:3]
-        d_q = np.dot(np.linalg.inv(jj), d_x)
-        q_start[0:3] = q_start[0:3] + d_q
-        i = i+1
-    return q_start
-
