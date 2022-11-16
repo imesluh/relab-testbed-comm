@@ -5,20 +5,27 @@ import numpy as np
 import gevent
 import os
 import csv
+import traceback
+import pdb
 
 def connect(address):
     #global conn, nodes
     conn = Client(address)
     conn.connect()
     nodes = conn.get_objects_node()
+    # try:
+    #     conn.export_xml([nodes], "/var/www/robotiki/opcua_nodes.xml")
+    # except Exception as e:
+    #     pdb.set_trace()
+    #     print(e)
+    #     print(traceback.format_exc())
     return conn, nodes
 
 def disconnect(conn):
     conn.disconnect()
     print("Disconnected OPCUA communication.")
 
-
-def communicate(nodes, intType, intData, timeout):
+def communicate_backup(nodes, intType, intData, timeout):
     """
     Die Funktion sendet einen Wert an den Versuchsstand (wenn intType = 0, 2, 3 oder 4) bzw. liest den Wert (wenn
     intType = 1
@@ -55,6 +62,14 @@ def communicate(nodes, intType, intData, timeout):
             if not isinstance(intType, list):
                 intType = [intType]
                 intData = [intData]
+            if int(3) in intType:
+                print("Achswerte an YU:")
+                print(intType)
+                print(intData)
+            elif int(0) in intType:
+                print("Labornummer an Yu:" + str(intData))
+            elif int(2) in intType:
+                print("Start an Yu: " + str(intData))
             for intT, intD in zip(intType, intData):
                 if intT in [0,2,3,4]:
                     nodes.get_children()[7].get_children()[1].get_children()[intT].set_value(int(intD),
@@ -80,9 +95,153 @@ def communicate(nodes, intType, intData, timeout):
     except Exception as e:
         raise e
 
+def communicate(nodes, intType, intData, timeout):
+    """
+    Die Funktion sendet einen Wert an den Versuchsstand (wenn intType = 0, 2, 3 oder 4) bzw. liest den Wert (wenn
+    intType = 1
+
+    :param nodes: Nodes der OPCUA-Schnittstelle
+    :type nodes: OPCUA-Nodes
+    :param intType: Zähler bzw. Kanal, welcher Wert geschickt bzw. gelesen wird:
+                    0: Labornummer (write) (States fuer die State Machine auf dem Yu)
+                    1: Status (read), WERTE: 0: Ready; 1: Busy; 2: Wert wurde an den Yu gesendet
+                    2: Start (write)
+                    3: Achszähler (1-6) (write)
+                    4: Winkel in Grad (write)
+    :type intType: integer oder list of integer
+    :param intData: Zahlenwert, nur beim Schreiben von Interesse
+    :type intData: integer oder list of integer
+    :param timeout: max. Zeit in Sekunden für das Senden
+    :type timeout: float
+
+    :return: Erfolg (beim Senden) oder Wert (beim Lesen)
+    :rtpype: boolean bzw. integer
+    """
+    try:
+        if intType==1:
+            # read value from opcua node
+            busy = nodes.get_children()[7].get_children()[1].get_children()[intType].get_value()
+            return busy
+        else:
+            # write data to opcua node
+            if np.isscalar(intType):       #not isinstance(intType, list):
+                intType = [intType]
+                intData = [intData]
+            if int(3) in intType:
+                print("Achswerte an YU:")
+                print(intType)
+                print(intData)
+            elif int(0) in intType:
+                print("Labornummer an Yu:" + str(intData))
+            elif int(2) in intType:
+                print("Start an Yu: " + str(intData))
+            for intT, intD in zip(intType, intData):
+                if not (intT in [0,2,3,4]):
+                    raise Exception('tb.communicate(): intType muss in der Range 0...4 liegen.')
+                nodes.get_children()[7].get_children()[1].get_children()[intT].set_value(int(intD), ua.VariantType.Int32)   # write value to opcua node
+                time.sleep(0.001)
+
+            nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32)  # tell the server we wrote new values
+            # check if server read the new value (if server set "status" to busy or ready)
+            tStart = datetime.datetime.now()
+            while True:
+                if nodes.get_children()[7].get_children()[1].get_children()[1].get_value() < 2:
+                    break
+                if (datetime.datetime.now() - tStart).total_seconds() > timeout:
+                    print(' >>>>>>>>>>>>> Das Paket ist nicht innerhalb des Timeout angekommen.')
+                    return False
+                time.sleep(0.001)
+            # all new values were read by the server
+            return True
+
+            ################################
+            # nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32) # tell the server we wrote new values
+            # # print(nodes.get_children())
+            # # print(nodes.get_children()[7].get_children())
+            # # print(nodes.get_children()[7].get_children()[1].get_children())
+            # # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
+            # #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_methods())
+            # #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
+            # # print(nodes.get_children_descriptions)
+            # tStart = datetime.datetime.now()
+            # while True:
+            #     if nodes.get_children()[7].get_children()[1].get_children()[1].get_value() < 2:
+            #         continue
+            #     if (datetime.datetime.now()-tStart).total_seconds() > timeout:
+            #         raise Exception('Das Paket ist nicht innerhalb des Timeout angekommen.')
+            #     time.sleep(0.001)
+            # return True
+    except Exception as e:
+        #print(traceback.print_exc())
+        raise e
+
+def sendLabNumber(nodes, labnumber):
+    """
+    Send lab number (State) to the Yu
+    """
+    communicate(nodes, int(0), int(labnumber), timeout=5)
+
+def startAction(nodes):
+    """
+    Setze "Start" auf True: Nur dann kann der Yu in einen State wechseln und z.B. Bewegungen ausfuehren
+    """
+    communicate(nodes, int(2), 1, timeout=5)  # Starten der Bewegung
+    time.sleep(0.2) # warten bis gevent-thread mind. einmal Status vom Versuchsstand abgefragt hat (der nicht mehr ready ist)
+
+def isReady(nodes):
+    """
+    return if Yu is ready
+    """
+    if (getStatus(nodes) == 0):
+        return True
+    else:
+        return False
+
 def getStatus(nodes):
-    # nodes.get_children()[7].get_children()[1].get_children()[1].get_value()
-    pass
+    """
+    return Status of Yu
+    0: ready
+    1: Busy
+    2: value sent to the Server, but server did not yet read
+    """
+    status = communicate(nodes, int(1), 1, timeout=5)
+    return status
+
+def sendAxValues_deg(nodes, q_deg):
+    """
+    Die Funkion sendet Achswerte (in Grad) an den Yu.
+
+    :param nodes: Nodes der OPCUA-Schnittstelle
+    :type nodes: OPCUA-Nodes
+    :param q_deg: Liste oder numpy array der Achswerte in Grad
+    :type q_deg: list or numpy array
+
+    :return: Success
+    :rtpype: boolean
+    """
+    if np.isscalar(q_deg):
+        q_deg = [q_deg]
+    length = 0
+    try:
+        length = len(q_deg)
+    except:
+        length = q_deg.size
+    if (length != 6):
+        print("sendAxValues_deg(): Ungültiges Argument übergeben.")
+        return False
+
+    bSuccess = True
+    for winkel, achse in zip(q_deg, range(len(q_deg))):  # Achswinkel senden
+        bSent = communicate(nodes, [3, 4], [achse + 1, winkel * 100], timeout=5)
+        if not bSent:
+            print("Winkel fuer Achse mit Index " + str(achse) + " konnte nicht uebermittelt werden.")
+            bSuccess = False
+            raise Exception('Uebermittlung der Achswinkel an den Yu fehlgeschlagen.')
+        time.sleep(0.001)
+    return bSuccess
+
+
+
 def readAxValues(nodes):
     """
     Die Funktion liest die Achswerte aus. Im Gegensatz zum lesen der Werte in communicate() sind diese Werte nicht von
@@ -190,14 +349,12 @@ def send_ITP(nodes, to):
             :param to: timeout,max. Zeit in Sekunden für das Senden
             :type to: float
             """
-    # Roboter in Home-Position fahren
-    pos_home = [0,-90,90,-90,-90,0]     #  Achswinkel der home position
+    while not (communicate(nodes, int(1), 1, timeout=5) == 0):
+        time.sleep(0.5)
+        print("%%% ITP: Warte bis Yu bereit ist, um ITP zu senden.")
 
-    communicate(nodes, int(0), int(0), timeout=to)    # Labornummer "0" für Bewegungsvorgabe
-    for angle, axes in zip(pos_home, range(len(pos_home))):  # Achswinkel senden
-        communicate(nodes, [3, 4], [axes + 1, angle * 100], timeout=to)
-        time.sleep(0.01)
-
+    # "Labornummer" (State) fuer den Yu senden
+    communicate(nodes, int(0), int(99), timeout=5)
     # Starten der Bewegung
     communicate(nodes, int(2), 1, timeout=to)  # Starten der Bewegung
     state = False
@@ -208,4 +365,4 @@ def send_ITP(nodes, to):
             break
         state = communicate(nodes, int(1), 0, timeout=to)
         print("%%% ITP: moving towards home position..")
-        time.sleep(0.1)
+        time.sleep(0.5)
