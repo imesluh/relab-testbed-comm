@@ -153,24 +153,6 @@ def communicate(nodes, intType, intData, timeout):
                 time.sleep(0.001)
             # all new values were read by the server
             return True
-
-            ################################
-            # nodes.get_children()[7].get_children()[1].get_children()[1].set_value(2, ua.VariantType.Int32) # tell the server we wrote new values
-            # # print(nodes.get_children())
-            # # print(nodes.get_children()[7].get_children())
-            # # print(nodes.get_children()[7].get_children()[1].get_children())
-            # # print(nodes.get_children()[7].get_children()[1].get_children()[1].get_display_name())
-            # #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_methods())
-            # #print(nodes.get_children()[7].get_children()[1].get_children()[1].get_variables())
-            # # print(nodes.get_children_descriptions)
-            # tStart = datetime.datetime.now()
-            # while True:
-            #     if nodes.get_children()[7].get_children()[1].get_children()[1].get_value() < 2:
-            #         continue
-            #     if (datetime.datetime.now()-tStart).total_seconds() > timeout:
-            #         raise Exception('Das Paket ist nicht innerhalb des Timeout angekommen.')
-            #     time.sleep(0.001)
-            # return True
     except Exception as e:
         #print(traceback.print_exc())
         raise e
@@ -179,14 +161,14 @@ def sendLabNumber(nodes, labnumber):
     """
     Send lab number (State) to the Yu
     """
-    communicate(nodes, int(0), int(labnumber), timeout=5)
+    return communicate(nodes, int(0), int(labnumber), timeout=5)
 
 def startAction(nodes):
     """
     Setze "Start" auf True: Nur dann kann der Yu in einen State wechseln und z.B. Bewegungen ausfuehren
     """
     communicate(nodes, int(2), 1, timeout=5)  # Starten der Bewegung
-    time.sleep(0.2) # warten bis gevent-thread mind. einmal Status vom Versuchsstand abgefragt hat (der nicht mehr ready ist)
+    time.sleep(0.15) # warten bis gevent-thread mind. einmal Status vom Versuchsstand abgefragt hat (der nicht mehr ready ist)
 
 def isReady(nodes):
     """
@@ -240,7 +222,13 @@ def sendAxValues_deg(nodes, q_deg):
         time.sleep(0.001)
     return bSuccess
 
+def turnOnLight(nodes):
+    if sendLabNumber(nodes, 91):
+        startAction(nodes)
 
+def turnOffLight(nodes):
+    if sendLabNumber(nodes, 90):
+        startAction(nodes)
 
 def readAxValues(nodes):
     """
