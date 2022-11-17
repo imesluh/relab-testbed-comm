@@ -337,20 +337,26 @@ def send_ITP(nodes, to):
             :param to: timeout,max. Zeit in Sekunden für das Senden
             :type to: float
             """
-    while not (communicate(nodes, int(1), 1, timeout=5) == 0):
+    print("%%% ITP")
+    while not isReady(nodes):
         time.sleep(0.5)
         print("%%% ITP: Warte bis Yu bereit ist, um ITP zu senden.")
 
     # "Labornummer" (State) fuer den Yu senden
-    communicate(nodes, int(0), int(99), timeout=5)
+    #communicate(nodes, int(0), int(99), timeout=5)
+    sendLabNumber(nodes, 99)
     # Starten der Bewegung
-    communicate(nodes, int(2), 1, timeout=to)  # Starten der Bewegung
-    state = False
+    #communicate(nodes, int(2), 1, timeout=to)  # Starten der Bewegung
+    startAction(nodes)   # Starten der Bewegung
+    busy = True
     # warten bis Home-Bewegung durchgeführt
     start = datetime.datetime.now()
-    while not state:
+    busy = communicate(nodes, int(1), 0, timeout=to)
+    while busy:
         if (datetime.datetime.now() - start).total_seconds() > to:
-            break
-        state = communicate(nodes, int(1), 0, timeout=to)
+            if busy == 2:
+                print(' >>>>>>>>>>>>> ITP: Das Paket ist nicht innerhalb des Timeout angekommen.')
+                break
+        busy = communicate(nodes, int(1), 0, timeout=to)
         print("%%% ITP: moving towards home position..")
         time.sleep(0.5)
