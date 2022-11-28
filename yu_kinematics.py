@@ -80,6 +80,66 @@ def direct_kinematics(q):
     # TODO: Rueckgabe trennen in Pos+Orientierung?
     return np.vstack((Position,Orientierung)), T
 
+def direct_kinematics_7(q):
+    """
+    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
+    in Kardanwinkel-Notation, die DHP Matrizen und die Transformationmatrizen
+
+    :param q: 6 Gelenkwinkel des Yu in rad
+    :type q:  numpy.array, list
+
+    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
+             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
+    :rtype: numpy.array, numpy.array
+    """
+    l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290])  # Längen des Yu
+    DHP = np.array([[q[0], l[0], 0, -np.pi / 2],
+                    [q[1], l[1], l[2], 0],
+                    [q[2], -l[3], l[4], 0],
+                    [q[3], -l[5], 0, np.pi / 2],
+                    [q[4], -l[6], 0, -np.pi / 2],
+                    [q[5], -l[7], 0, np.pi]])  # DH-Parameter des Yu
+
+    # Initialisierung und Berechnung der Denavit-Hartenberg-Matrizen
+    A = np.zeros(shape=(4, 4, 7))
+    A[:, :, 0] = [[1,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1]]
+    for u in range(6):
+        A[:, :, u+1] = np.array([[np.cos(DHP[u, 0]), -np.sin(DHP[u, 0]) * np.cos(DHP[u, 3]),
+                                np.sin(DHP[u, 0]) * np.sin(DHP[u, 3]), DHP[u, 2] * np.cos(DHP[u, 0])],
+                               [np.sin(DHP[u, 0]), np.cos(DHP[u, 0]) * np.cos(DHP[u, 3]),
+                                -np.cos(DHP[u, 0]) * np.sin(DHP[u, 3]), DHP[u, 2] * np.sin(DHP[u, 0])],
+                               [0, np.sin(DHP[u, 3]), np.cos(DHP[u, 3]), DHP[u, 1]],
+                               [0, 0, 0, 1]])
+
+    # Berechnung der Transformationsmatrizen
+    T = np.zeros(shape=(4, 4, 7))
+    T[:, :, 0] = A[:, :, 0]
+    T[:, :, 1] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1]))
+    T[:, :, 2] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1], A[:, :, 2]))
+    T[:, :, 3] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1], A[:, :, 2], A[:, :, 3]))
+    T[:, :, 4] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1], A[:, :, 2], A[:, :, 3], A[:, :, 4]))
+    T[:, :, 5] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1], A[:, :, 2], A[:, :, 3], A[:, :, 4], A[:, :, 5]))  # 4x4 Trafo
+    T[:, :, 6] = np.linalg.multi_dot((A[:, :, 0], A[:, :, 1], A[:, :, 2], A[:, :, 3], A[:, :, 4], A[:, :, 5],  A[:, :, 6]))
+
+    # Initialisierung der Positionsmatrix und Orientierungsmatrix
+    Position = np.zeros(shape=(3, 6))
+    Orientierung = np.zeros(shape=(3, 6))
+
+    # Berechnung von Position und Orientierung der einzelnen Koordinatensysteme
+    for u in range(6):
+        Position[:, u] = T[:3, 3, u+1]
+
+        # Berechnung der Orientierung (in Kardanwinkeln)
+        alpha = np.arctan2(-T[1, 2, u+1], T[2, 2, u+1])
+        gamma = np.arctan2(-T[0, 1, u+1], T[0, 0, u+1])
+        beta = np.arctan2(T[0, 2, u+1], T[0, 0, u+1] * np.cos(gamma) - T[0, 1, u+1] * np.sin(gamma))
+        Orientierung[:, u] = [alpha, beta, gamma]
+
+    # Rückgabe der Orientierung in 6-FHG
+    # TODO: Rueckgabe trennen in Pos+Orientierung?
+    return np.vstack((Position, Orientierung)), A, T
+
+
 def detect_invalid_angpos(q, workspace, dim):
     """
     Die Funktion ermittelt welche Achsen den Arbeitsraum (kartesisch oder zylindrisch) verletzen.
@@ -131,7 +191,7 @@ def generatePoses(numPos, validPos, workspace, dim, gap):
 
     pose = []
     valid= []
-    validC = 0
+    validC = 0      # counter valid poses
     invalidC = 0
     while validC+invalidC<numPos:
         qs = deg2rad(np.random.uniform(q_lim[:, 0], q_lim[:, 1], (samples, 6)))
@@ -195,6 +255,186 @@ def geoJacobi(q):
     J_geo = np.transpose(J_geo)
     J_geo = J_geo.round(7)
     return J_geo
+
+def bahnplanung(q_start, q_ziel, dT):
+    """
+    Die Funktion generiert Die Synchronisierte Bahnplanung
+
+    :param q_start: Startgelenkskoordinaten in grad
+    :type q_start:  list
+    :param q_ziel: Zielgelenkskoordinaten in grad
+    :type q_ziel:  list
+    :param dT: Diskritisierungsinterval
+    :type dT: float
+
+    :returns: Positionsprofil [6xn];  Geschwindigkeitprofil [6xn]; Beschluenigungprofil [6xn]; Zeit [1xn]
+    :rtype: list; list; list; list
+
+    """
+    # Bahnrandbedingungen initialisieren
+    max_qd = 2.618*np.ones((6, 1)) # Maximale Geschwindigkeit [rad/sec]
+    max_qdd = np.array((15, 5, 10, 10, 20, 20)) # Maximale Beschleunigung [rad/sec²]
+    max_qdd = np.reshape(max_qdd,(6,1))
+    # Initialisierung der benötigten Varianlen
+    t1 = np.zeros((6,1))
+    t2 = np.zeros((6, 1))
+    tges = np.zeros((6, 1))
+    qges = np.zeros((6, 1))
+    sd = 0
+    sdd = 0
+    Q = np.zeros((6,1))
+    Qd = np.zeros((6,1))
+    Qdd = np.zeros((6,1))
+    vs_max = np.zeros((6,1))
+    as_max = np.zeros((6,1))
+    i = 0
+    while i < 6:
+        # Disktretisierungsintervall
+        qges[i] = q_ziel[i] - q_start[i]
+        # Überprufung ob maximale Geschwindigkeit erreicht wird
+        if max_qd[i] > np.sqrt(np.abs(qges[i]))*max_qdd[i]:
+            max_qd[i] =  np.sqrt(np.abs(qges[i]))*max_qdd[i]
+        i = i+1
+
+    i = 0
+    while i < 6:
+        # Bestimmung der Zeitabschnitte für jede Achse
+        t1[i] = max_qd[i] / max_qdd[i]
+        if max_qd[i] != 0:
+            tges[i] = np.abs(qges[i])/max_qd[i] + t1[i]
+        i = i + 1
+    t2 = tges-2*t1
+
+    # Bestimmung der langsamsten Achse und deren Index im Vektor tges
+    tges_max = np.max(tges)
+    Index = np.argmax(tges)
+
+
+    #Diskretisierung der Zeitbereiche
+    t1_dis = np.arange(0, t1[Index], dT)
+    t2_dis = np.arange(t1[Index] + dT, t1[Index] + t2[Index], dT)
+    t3_dis = np.arange(t1[Index] + t2[Index]+ dT, tges_max, dT)
+
+    t = np.concatenate((t1_dis, t2_dis, t3_dis))
+
+    # Überfüuhrung der Maximalgeschwindigkeiten und -beschluenigungen in Bahnkoordinaten
+    i = 0
+    while i < 6:
+        if qges[i] != 0:
+            vs_max[i] = np.abs(max_qd[i]/qges[i])
+            as_max[i] = np.abs(max_qdd[i]/qges[i])
+        i = i + 1
+
+    #bestimmung der Positionsprofils der Bahnkoordinate für die langsamste Achse
+    s1 = 0.5*as_max[Index]*t1_dis**2
+    s2 = 0.5 * as_max[Index] * t1[Index] ** 2 + vs_max[Index] * (t2_dis - t1[Index])
+    s3 = 0.5 * as_max[Index] * t1[Index] ** 2 + vs_max[Index] * t2[Index] + 0.5 * (-as_max[Index]) *(t3_dis - (t1[Index] + t2[Index]))** 2 + vs_max[Index] * (t3_dis - (t1[Index] + t2[Index]))
+
+    # Zusammenfassung des Positionsprofils
+    s = np.concatenate((s1,s2,s3))
+
+    # Bestimmung des Geschwindigkeitsprofils der Bahnkoordinate für die langsamste Achse
+    s1d = as_max[Index] * t1_dis
+    s2d = vs_max[Index] * np.ones([np.product(t2_dis.shape)])
+    s3d = as_max[Index] * ((t1[Index] + t2[Index]) - t3_dis) + vs_max[Index]
+
+    # Zusammenfassung des Geschwindigkeitsprofils
+    sd = np.concatenate((s1d,s2d,s3d))
+
+
+    # Bestimmung des Beschleunigungsprofils der Bahnkoordinate für die langsamste Achse
+    s1dd = as_max[Index] * np.ones(np.product(t1_dis.shape))
+    s2dd = 0 * np.ones(np.product(t2_dis.shape))
+    s3dd = -as_max[Index] * np.ones(np.product(t3_dis.shape))
+
+    # Zusammenfassung des Beschleinigungsprofils
+    sdd = np.concatenate((s1dd,s2dd,s3dd))
+
+    # Berechnen der synchronisierten Bahnprofile
+    Q = np.zeros([6, max(s.shape)])
+    Qd = np.zeros([6, max(sd.shape)])
+    Qdd = np.zeros([6, max(sdd.shape)])
+
+    i = 0
+    while i < 6:
+        Q[i,:] = q_start[i] + s*qges[i]
+        Qd[i, :] = sd * qges[i]
+        Qdd[i, :] = sdd * qges[i]
+        i = i + 1
+    return Q, Qd, Qdd, t
+
+def lagrange(q_start, q_ziel, dT):
+    """
+       Die Funktion berechnet die kinetische und potentielle Energie und die Lagrange Funktion
+
+       :param q_start: Startgelenkskoordinaten in grad
+       :type q_start:  list
+       :param q_ziel: Zielgelenkskoordinaten in grad
+       :type q_ziel:  list
+       :param dT: Diskritisierungsinterval in sec
+       :type dT: float
+
+       :returns: potentielle Energie [1xn]; kinetische Energie [1xn]; Lagrang Funktion [1xn]; Zeit [1xn]
+       :rtype: list; list; list; list
+
+       """
+    # Gravitationsvektor [m * s ^ -2]
+    g = np.array([0, 0, -9.8])
+    # [kg.m ^ 2] Trägheitsmomente
+    Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
+    # [kg] Massen
+    m = np.array([5.9, 9.5, 4.5, 2.6, 2.5, 2])
+    # Schwärpunktsabstände in x - y - und z - Richtung jeder KS_i[m]
+    rs_i_i = np.array([[0, -233, -186, 0, 0, 0],
+                       [6, 0, 0, 24, -16, 1.5],
+                       [33, -5, 27.5, 0.75, 6, -73]])/10**3
+    # synchronisierte Bahnplahnung
+    Q, Qd, Qdd, t = bahnplanung(q_start, q_ziel, dT)
+    # Initialisierungen
+    r_GiG_KSi = np.zeros([3, 7])
+    r_GiG_KS0 = np.zeros([3, 7])
+    r_0Gi = np.zeros([3, 7])
+    vr_0_i = np.zeros([3, 7])
+    rs_0_i = np.zeros([3, 6])
+    w_i_KSi = np.zeros([3, 6])
+    w_i_KS0 = np.zeros([3, 6])
+    vrs_0_i = np.zeros([3, 6])
+    Ji_KSi = np.zeros([3, 3, 6])
+    Ji_KS0 = np.zeros([3, 3, 6])
+    T_tr = np.zeros([6, 1])
+    T_ro = np.zeros([6, 1])
+    U_ = np.zeros([6, 1])
+    U_E = np.zeros([max(Q.shape), 1])
+    T_E = np.zeros([max(Q.shape), 1])
+    L_E = np.zeros([max(Q.shape), 1])
+    for index, item in enumerate(Q.T):
+        # Anwendung der direkte Kinemati mit 7 Matrzen
+        xe, A, T = direct_kinematics_7(item.T)
+        # Berechnung der Schwärpunktsortsvektoren und -richtungesvektoren in KS_i und KS_0
+        for u in range(7):
+            r_GiG_KSi[:, u] = A[0:3, -1, u]
+            r_0Gi[:, u] = T[0:3, -1, u]
+            r_GiG_KS0[:, u] = np.matmul(T[0:3, 0:3, u], r_GiG_KSi[:, u])
+            # r_GiG_KS0[:, u] = r_0Gi[:, u]
+
+        for u in range(6):
+            # Geschwindigkeiten und Winkelgeschwindigkeiten
+            rs_0_i[:, u] = np.matmul(T[0:3, 0:3, u], rs_i_i[:, u])
+            w_i_KSi[-1, u] = Qd[u, index]
+            w_i_KS0[:, u] = np.matmul(T[0:3, 0:3, u],w_i_KSi[:, u])
+            vr_0_i[:, u+1] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], r_GiG_KS0[:, u+1])
+            vrs_0_i[:, u] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], rs_0_i[:, u])
+            # Trägheitsmomente
+            Ji_KSi[-1, -1, u] = Jzz[u]
+            Ji_KS0[:, :, u] = np.matmul(np.matmul(T[0:3, 0:3, u+1], Ji_KSi[:, :, u]), T[0:3, 0:3, u+1].T)
+            # Potentielle und kinetische Energie
+            T_tr[u] = 0.5*m[u]*np.matmul(vrs_0_i[:, u].T, vrs_0_i[:, u])
+            T_ro[u] = 0.5*np.matmul(np.matmul(w_i_KS0[:, u].T, Ji_KS0[:, :, u]), w_i_KS0[:, u])
+            U_[u] = -m[u]*np.matmul(g.T, rs_0_i[:, u])
+        T_E[index] = sum(T_tr) + sum(T_ro)
+        U_E[index] = sum(U_)
+        L_E[index] = T_E[index]-U_E[index]
+    return U_E, T_E, L_E, t
 
 def iterative_inv_kin(pose, q_start, itr):
     """
