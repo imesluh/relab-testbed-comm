@@ -500,15 +500,16 @@ def transRot2T(r,R):
     T[0:3, 0:3] = R
     return T
 
-def rad2deg(qs):
+def rad2deg(q_rad):
     """
     Die Funktion rechnet die Gelenkwinkel in rad in ° um.
 
-    :param qs: Gelenkwinkel in rad
-    :type qs: numpy.array, list
+    :param q_rad: Gelenkwinkel in rad
+    :type q_rad: numpy.array, list
 
     :rtype: numpy.array, list
     """
+    qs = copy.deepcopy(q_rad)
     try:
         i=0
         for q in qs:
@@ -518,15 +519,16 @@ def rad2deg(qs):
         qs = np.float64(qs*180/np.pi)
     return qs
 
-def deg2rad(qs):
+def deg2rad(q_deg):
     """
         Die Funktion rechnet die Gelenkwinkel in ° in rad um.
 
-        :param qs: Gelenkwinkel in °
-        :type qs: numpy.array, list
+        :param q_deg: Gelenkwinkel in °
+        :type q_deg: numpy.array, list
 
         :rtype: numpy.array, list
         """
+    qs = copy.deepcopy(q_deg)
     i = 0
     for q in qs:
         qs[i] = q * np.pi/180
@@ -720,14 +722,15 @@ def eulxzx2r(phi):
                     [t22 * t21, t23 * t28 + t27, -t20 * t28 + t26]])
     return r
 
-def r2quat(R):
+def r2quat(R_in):
     """
     Umwandlung von Rotationsmatrix nach Quaternionen-Darstellung
-    :param R: Rotationsmatrix [3x3]
+    :param R_in: Rotationsmatrix [3x3]
 
     :return q: Quaterionen: Erste w (Winkel), dann xyz (Rotationsachsen) [4x1]
     :rtype: numpy.list
     """
+    R = copy.deepcopy(R_in)
     # transponieren, damit uebereinstimmend mit Robotik-Skript und Stanford-Paper
     R = R.transpose()
     r11=R[0,0]
