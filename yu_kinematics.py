@@ -1,6 +1,7 @@
 """
 Kinematikfunktionen des Yuanda Yu und kinematik-bezogene mathematische Funktionen
 """
+import copy
 
 import numpy as np
 import math
@@ -25,7 +26,7 @@ q_lim = np.array([[-180, 180],
 ##### kinematic functions Yuanda Yu
 def direct_kinematics(q):
     """
-    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
+    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Orientierung
     in Kardanwinkel-Notation.
 
     :param q: 6 Gelenkwinkel des Yu in rad
@@ -82,7 +83,7 @@ def direct_kinematics(q):
 
 def direct_kinematics_7(q):
     """
-    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Pose
+    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Orientierung
     in Kardanwinkel-Notation, die DHP Matrizen und die Transformationmatrizen
 
     :param q: 6 Gelenkwinkel des Yu in rad
@@ -166,6 +167,28 @@ def detect_invalid_angpos(q, workspace, dim):
     ind = [x + 1 for x in ind]
     return ind
 
+def isValidPose(q, workspace, dim):
+    """
+        Die Funktion ermittelt, ob eine Pose den Arbeitsraum (kartesisch oder zylindrisch) verletzt.
+
+        :param q: 6 Gelenkwinkel des Yu in rad (ein Gelenkwinkel pro Zeile bei mehreren Positionen)
+        :type q:  numpy.array, list
+        :param workspace: Art des Arbeitsraumes ('cartesian', 'cylindric')
+        :type workspace:  string
+        :param dim: Ausdehnung des Arbeitsraumes (x,y,z für 'cartesian' und r,h für 'cylindric'). Die y- und y-Werte für den
+                    kartesischen Arbeitsraum werden positiv und negativ berücksichtigt, der z-Wert rein positiv.
+        :type dim: numpy.array, list
+
+        :return: Bool, ob Pose gueltig
+        :rtype: bool
+        """
+    ind = detect_invalid_angpos(q, workspace, dim)
+    if len(ind) == 0:
+        return True
+    else:
+        return False
+
+
 def generatePoses(numPos, validPos, workspace, dim, gap):
     """
     Die Funktion generiert eine gewählte Anzahl von Positionen innerhalb sowie außerhalb des Arbeitsraumes
@@ -218,7 +241,7 @@ def geoJacobi(q):
     """
     Die Funktion generiert Dir Geometrische Jacobi einer gegeben Gelenkskoordinaten
 
-    :param q: gelenkskoordinaten in grad
+    :param q: gelenkskoordinaten in rad
     :type q:  list
     
     :return: geometrische Jacobi [6x6] 
@@ -449,19 +472,20 @@ def iterative_inv_kin(pose, q_start, itr):
     :param itr: Iterationszahl
     :type itr:  int
 
-    :return: Gelenkskoordinaten  [6x1]
+    :return: Gelenkskoordinaten  [6x1] in rad
     :rtype: list
     """
+    q_iter = copy.deepcopy(q_start)
     i = 1
     while i < itr:
-        pose_ink = direct_kinematics(q_start)[0][:, 5]
+        pose_ink = direct_kinematics(q_iter)[0][:, 5]
         d_x = pose - pose_ink[0:3]
-        j = geoJacobi(q_start)
+        j = geoJacobi(q_iter)
         jj = j[0:3, 0:3]
         d_q = np.dot(np.linalg.inv(jj), d_x)
-        q_start[0:3] = q_start[0:3] + d_q
+        q_iter[0:3] = q_iter[0:3] + d_q
         i = i+1
-    return q_start
+    return q_iter
 
 #### Transformation functions and unit conversions
 def transRot2T(r,R):
