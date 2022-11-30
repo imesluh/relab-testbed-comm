@@ -128,9 +128,9 @@ def communicate(nodes, intType, intData, timeout):
                 intType = [intType]
                 intData = [intData]
             if int(3) in intType:
-                print("Achswerte an YU:")
-                print(intType)
-                print(intData)
+                print("Achswerte an YU: " + str(intData[0]) + " - " + str(intData[1]/100) + " degree")
+                # print(intType)
+                # print(intData)
             elif int(0) in intType:
                 print("Labornummer an Yu:" + str(intData))
             elif int(2) in intType:
