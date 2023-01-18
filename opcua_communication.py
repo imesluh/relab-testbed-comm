@@ -299,7 +299,7 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
                 t, q, dq, pos = readAxValues(yu_nodes)
                 if (t - lastT) >= 0.97 * sample_time:
                     lastT = t
-                    signal = np.concatenate((q, dq, pos))
+                    signal = np.concatenate((q, dq, pos))   # TODO: Warum wird hier t nicht mit hereingeschrieben?
                     data_now = [signal[x] for x in indices]
                     data_now.insert(0, t-startT)
                     spamwriter.writerow(data_now)

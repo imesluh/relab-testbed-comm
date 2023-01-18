@@ -3,6 +3,7 @@ Kinematikfunktionen des Yuanda Yu und kinematik-bezogene mathematische Funktione
 """
 import copy
 
+import numpy
 import numpy as np
 import math
 
@@ -279,6 +280,103 @@ def geoJacobi(q):
     J_geo = J_geo.round(7)
     return J_geo
 
+def getDynPar():
+    """
+    Gebe Dynamikparameter des Yu zurück
+    """
+    m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 1.025]) # in kg
+    # %% Massenträgheitstensoren und Schwerpunktskoordinaten
+    # % aller Segmente i im KS_i (Wahl der KS_i nach CÜ2)
+    J_i_i = np.zeros([3, 3, 6])
+    r_i_Si = np.zeros([3, 6])
+    # % Link1
+    i = 1 - 1
+    J_i_i[0, 0, i] = 4.641e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 3.619e-2 # Iyy
+    J_i_i[2, 2, i] = 2.264e-2 # Izz
+    J_i_i[0, 1, i] = 0.002e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = -0.001e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = 0.001e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = 0.02e-3 # x_Si in m
+    r_i_Si[1, i] = 6.35e-3 # y_Si
+    r_i_Si[2, i] = 33.42e-3 # z_Si
+    # # Link2
+    i = 2 - 1
+    J_i_i[0, 0, i] = 4.223e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 99.637e-2 # Iyy
+    J_i_i[2, 2, i] = 97.760e-2 # Izz
+    J_i_i[0, 1, i] = 0.006e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = 1.707e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = 0e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = -233.26e-3 # x_Si in m
+    r_i_Si[1, i] = 0e-3 # y_Si
+    r_i_Si[2, i] = -4.83e-3 # z_Si
+    # Link3
+    i = 3 - 1
+    J_i_i[0, 0, i] = 3.218e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 44.258e-2 # Iyy
+    J_i_i[2, 2, i] = 41.879e-2 # Izz
+    J_i_i[0, 1, i] = -0.002e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = -7.558e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = 0e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = -186.89e-3 # x_Si in m
+    r_i_Si[1, i] = -0.04e-3 # y_Si
+    r_i_Si[2, i] = 27.56e-3 # z_Si
+    # Link4
+    i = 4 - 1
+    J_i_i[0, 0, i] = 1.372e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 0.681e-2 # Iyy
+    J_i_i[2, 2, i] = 1.059e-2 # Izz
+    J_i_i[0, 1, i] = 0e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = -0.001e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = 0.004e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = -0.05e-3 # x_Si in m
+    r_i_Si[1, i] = 23.89e-3 # y_Si
+    r_i_Si[2, i] = 0.75e-3 # z_Si
+    # Link5
+    i = 5 - 1
+    J_i_i[0, 0, i] = 1.372e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 0.681e-2 # Iyy
+    J_i_i[2, 2, i] = 1.059e-2 # Izz
+    J_i_i[0, 1, i] = 0.001e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = 0.001e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = -0.004e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = 0.08e-3 # x_Si in m
+    r_i_Si[1, i] = -16.19e-3 # y_Si
+    r_i_Si[2, i] = 6.75e-3 # z_Si
+    # Link6
+    i = 6 - 1
+    J_i_i[0, 0, i] = 1.057e-2 # Ixx in kg * m ^ 2
+    J_i_i[1, 1, i] = 0.971e-2 # Iyy
+    J_i_i[2, 2, i] = 0.221e-2 # Izz
+    J_i_i[0, 1, i] = -0.001e-2 # Ixy
+    J_i_i[1, 0, i] = J_i_i[0, 1, i]
+    J_i_i[1, 2, i] = 0.001e-2 # Iyz
+    J_i_i[2, 1, i] = J_i_i[1, 2, i]
+    J_i_i[0, 2, i] = -0.003e-2 # Ixz
+    J_i_i[2, 0, i] = J_i_i[0, 2, i]
+    r_i_Si[0, i] = -0.13e-3 # x_Si in m
+    r_i_Si[1, i] = 1.5e-3 # y_Si
+    r_i_Si[2, i] = -73.84e-3 # z_Si
+    # Umrechnung zu mm
+    #J_i_i = J_i_i * 10 ^ 6 # [kg * mm ^ 2]
+    #r_i_Si = r_i_Si * 10 ^ 3 # [mm]
+    return r_i_Si, J_i_i, m
 def bahnplanung(q_start, q_ziel, dT):
     """
     Die Funktion generiert Die Synchronisierte Bahnplanung
@@ -386,6 +484,159 @@ def bahnplanung(q_start, q_ziel, dT):
         i = i + 1
     return Q, Qd, Qdd, t
 
+def lagrange_traj(csvPath):
+    """
+       Die Funktion berechnet die kinetische und potentielle Energie und die Lagrange Funktion
+       anhand des Download-Files
+
+       :param csvPath: Pfad zum Messschrieb
+       :type csvPath:  string
+
+       :returns: potentielle Energie [1xn]; kinetische Energie [1xn]; Lagrang Funktion [1xn]; Zeit [1xn]
+       :rtype: list; list; list; list
+
+       """
+    # Gravitationsvektor [m * s ^ -2]
+    g = np.array([0, 0, -9.81])
+    # [kg.m ^ 2] Trägheitsmomente
+    Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
+    # TODO: übrige Tensoreinträge fehlen
+    # [kg] Massen
+    m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 1.025])
+    # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 2])
+    # TODO: Trägheiten Greifer nicht berücksichtigt?
+    # Schwerpunktsabstände in x - y - und z - Richtung jeder KS_i[m], aus dem Yu- Datenblatt
+    rs_i_i = np.array([[0.02, -233.26, -186.89, -0.05, 0.08, -0.13],
+                       [6.35, 0, -0.04, 23.89, -16.19, 1.5],
+                       [33.42, -4.83, 27.56, 0.75, 6.75, -73.84]])/10**3
+
+
+    # synchronisierte Bahnplahnung
+    #Q, Qd, Qdd, t = bahnplanung(q_start, q_ziel, dT)
+
+    # Messschrieb einlesen
+    # np.genfromtxt(path_to_csv, dtype=float, delimiter=',', names=True)
+    csv = numpy.loadtxt(csvPath, delimiter=";", dtype=float, skiprows=1)
+    # names = csv[0, :]
+    # data = csv[1:, :]
+    data = csv
+    Q = data[:, 1:7] * math.pi/180
+    Qd = data[:, 7:13] * math.pi/180
+    Q = Q.T
+    Qd = Qd.T
+
+    #### Code von Grader
+    J_0_Si=np.zeros([3,3,6])#% Massenträgheitstensoren von Segment i um Schwerpunkt Si im KS_0
+    r_0_Si=np.zeros([3,6])#% Koordinaten von Schwerpunkt Si (Segment i) im KS_0
+    omega_0_i=np.zeros([3,6])#% Winkelgeschwindigkeit Segment i im KS_0
+    r_0_i=np.zeros([3,6])#% Position Segment i im KS_0
+    r_0_i1_i=np.zeros([3,6])#% Richtungsvektoren von KS_(i-1) nach KS_i im KS_0
+    rd_0_i=np.zeros([3,6])#% Geschwindigkeit Segment i im KS_0
+    rd_0_Si=np.zeros([3,6])#% Geschwindigkeit Schwerpunkt Si (Segment i) im KS_0
+    T_tr = np.zeros([6, 1])
+    T_ro = np.zeros([6, 1])
+    U_ = np.zeros([6, 1])
+    U = np.zeros([max(Q.shape), 1])
+    T = np.zeros([max(Q.shape), 1])
+    L = np.zeros([max(Q.shape), 1])
+    # # Dynamikparameter aus Funktion (aus Datenblatt, entspricht Grader-Lösung)
+    r_i_Si, J_i_Si, m = getDynPar()
+    #% Iteration über gesamte Trajektorie -> Berechnung der Energien für jeden Zeitschritt
+    for index, item in enumerate(Q.T):
+        q = Q[:, index]
+        qd = Qd[:, index]
+        xe, T_0_i = direct_kinematics(q.T)
+        # Iteration ueber alle Segmente
+        for i in range(6):
+            T_tmp = T_0_i[:,:,i]
+            R_tmp = T_tmp[0:3,0:3]
+            # % Schwerpunktskoordinaten und Massenträgheitstensoren aller
+            # % Segmente im KS_0 abhängig von der aktuellen Konfiquration q in rad
+            J_0_Si[:,:,i] = np.matmul(np.matmul(R_tmp, J_i_Si[:,:,i]), R_tmp.T)
+            x_0_Si = np.matmul(T_tmp, np.vstack((r_i_Si[:,[i]], 1)))
+            r_0_Si[:,i] = x_0_Si[0:3,0]
+            # Segmentpositionen im KS0
+            r_0_i[:,i] = T_tmp[0:3,-1]
+            #% Winkel- und Segmentgeschwindigkeiten im KS_0
+            if index == 0:
+                omega_0_i[:,i] = np.array([0,0,qd[i]])
+                r_0_i1_i[:,i] = r_0_i[:,i]
+                rd_0_i[:,i] = np.cross(omega_0_i[:,i],r_0_i1_i[:,i])
+            else:
+                omega_0_i[:, i] = omega_0_i[:,i-1] + qd[i] * T_0_i[0:3,2,i-1]
+                r_0_i1_i[:, i] = r_0_i[:,i] - T_0_i[0:3,-1,i-1]
+                rd_0_i[:, i] = rd_0_i[:, i-1] + np.cross(omega_0_i[:,i],r_0_i1_i[:,i])
+            # Schwerpunktgeschwindigkeiten im KS0
+            rd_0_Si[:,i] = rd_0_i[:,i] + np.cross(omega_0_i[:,i], r_0_Si[:,i] - r_0_i[:,i])
+            # kinetische Energie Segment i in J
+            T_tr_i = 0.5 * m[i] * np.matmul(rd_0_Si[:,i].T, rd_0_Si[:,i])
+            T_rot_i = 0.5 * np.matmul(np.matmul(omega_0_i[:,i].T, J_0_Si[:,:,i]), omega_0_i[:,i])
+            T_ges_i = T_tr_i + T_rot_i
+            # potentielle Energie Segment i
+            U_i = -m[i] * np.matmul(g.T, r_0_Si[:,i])
+
+            # Summiere Energien über alle Segmente
+            T[index] = T[index] + T_ges_i
+            U[index] = U[index] + U_i
+        L[index] = T[index] - U[index]
+    return U, T, L
+
+
+
+
+    # return Q,Qd
+
+    ## Code Abdullah, fehlerhaft
+    # # Initialisierungen
+    # r_GiG_KSi = np.zeros([3, 7])        # Bedeutung? r im KSi von i-1 zu i?
+    # r_GiG_KS0 = np.zeros([3, 7])
+    # r_0Gi = np.zeros([3, 7])
+    # vr_0_i = np.zeros([3, 7])
+    # rs_0_i = np.zeros([3, 6])
+    # w_i_KSi = np.zeros([3, 6])
+    # w_i_KS0 = np.zeros([3, 6])
+    # vrs_0_i = np.zeros([3, 6])
+    # Ji_KSi = np.zeros([3, 3, 6])
+    # Ji_KS0 = np.zeros([3, 3, 6])
+    # T_tr = np.zeros([6, 1])
+    # T_ro = np.zeros([6, 1])
+    # U_ = np.zeros([6, 1])
+    # U_E = np.zeros([max(Q.shape), 1])
+    # T_E = np.zeros([max(Q.shape), 1])
+    # L_E = np.zeros([max(Q.shape), 1])
+    #
+    # # Dynamikparameter aus Funktion (aus Datenblatt, entspricht Grader-Lösung)
+    # rs_i_i, Ji_KSi, m = getDynPar()
+    # for index, item in enumerate(Q.T):
+    #     # Anwendung der direkte Kinemati mit 7 Matrzen
+    #     xe, A, T = direct_kinematics_7(item.T)
+    #     # Berechnung der Schwärpunktsortsvektoren und -richtungesvektoren in KS_i und KS_0
+    #     for u in range(7):
+    #         r_GiG_KSi[:, u] = A[0:3, -1, u]
+    #         r_0Gi[:, u] = T[0:3, -1, u]
+    #         r_GiG_KS0[:, u] = np.matmul(T[0:3, 0:3, u], r_GiG_KSi[:, u])
+    #         # r_GiG_KS0[:, u] = r_0Gi[:, u]
+    #
+    #     for u in range(6):
+    #         # Geschwindigkeiten und Winkelgeschwindigkeiten
+    #         rs_0_i[:, u] = np.matmul(T[0:3, 0:3, u], rs_i_i[:, u])
+    #         w_i_KSi[-1, u] = Qd[u, index]
+    #         w_i_KS0[:, u] = np.matmul(T[0:3, 0:3, u],w_i_KSi[:, u])
+    #         vr_0_i[:, u+1] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], r_GiG_KS0[:, u+1])
+    #         vrs_0_i[:, u] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], rs_0_i[:, u])
+    #         # Trägheitsmomente
+    #         # Ji_KSi[-1, -1, u] = Jzz[u]
+    #         Ji_KS0[:, :, u] = np.matmul(np.matmul(T[0:3, 0:3, u+1], Ji_KSi[:, :, u]), T[0:3, 0:3, u+1].T)
+    #         # Potentielle und kinetische Energie
+    #         T_tr[u] = 0.5*m[u]*np.matmul(vrs_0_i[:, u].T, vrs_0_i[:, u])
+    #         T_ro[u] = 0.5*np.matmul(np.matmul(w_i_KS0[:, u].T, Ji_KS0[:, :, u]), w_i_KS0[:, u])
+    #         U_[u] = -m[u]*np.matmul(g.T, rs_0_i[:, u])
+    #     T_E[index] = sum(T_tr) + sum(T_ro)
+    #     U_E[index] = sum(U_)
+    #     L_E[index] = T_E[index]-U_E[index]
+    return U_E, T_E, L_E
+    # return U_E, T_E, L_E, t
+
 def lagrange(q_start, q_ziel, dT):
     """
        Die Funktion berechnet die kinetische und potentielle Energie und die Lagrange Funktion
@@ -402,12 +653,12 @@ def lagrange(q_start, q_ziel, dT):
 
        """
     # Gravitationsvektor [m * s ^ -2]
-    g = np.array([0, 0, -9.8])
+    g = np.array([0, 0, -9.81])
     # [kg.m ^ 2] Trägheitsmomente
     Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
     # [kg] Massen
     m = np.array([5.9, 9.5, 4.5, 2.6, 2.5, 2])
-    # Schwärpunktsabstände in x - y - und z - Richtung jeder KS_i[m]
+    # Schwerpunktsabstände in x - y - und z - Richtung jeder KS_i[m]
     rs_i_i = np.array([[0, -233, -186, 0, 0, 0],
                        [6, 0, 0, 24, -16, 1.5],
                        [33, -5, 27.5, 0.75, 6, -73]])/10**3
