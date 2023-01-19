@@ -25,6 +25,103 @@ q_lim = np.array([[-180, 180],
 
 
 ##### kinematic functions Yuanda Yu
+
+def get_dhp_yu(q):
+    """
+    DH-Parameter des Yuanda Yu in m und rad
+    """
+    l = np.array([0.17495, 0.1791, 0.450, 0.1751, 0.4078, 0.1422, 0.1422, 0.3290])  # Längen des Yu
+    DHP = np.array([[q[0], l[0], 0, -np.pi / 2],
+                    [q[1], l[1], l[2], 0],
+                    [q[2], -l[3], l[4], 0],
+                    [q[3], -l[5], 0, np.pi / 2],
+                    [q[4], -l[6], 0, -np.pi / 2],
+                    [q[5], -l[7], 0, np.pi]])  # DH-Parameter des Yu
+    return DHP
+
+def get_dhp_Lab4(q):
+    """
+    verfaelschte DH-Parameter eines anderen Roboters, NICHT vom Yu (siehe Grader)
+    """
+    l = np.array([190, 65, 450, 175.1]) * 0.001
+    DHP = np.array([[q[0], l[0], 0, -np.pi / 2],
+                    [q[1], 0, l[1], 0],
+                    [-q[2], 0, 0, np.pi / 2],
+                    [-q[3], l[2], 0, -np.pi / 2],
+                    [q[4], 0, 0, np.pi / 2],
+                    [-q[5], l[3], 0, 0]])
+    return DHP
+
+def ser_forkin(DHP):
+    """
+    Allgemeine Funktion der direkten Kinematik für seriellen Roboter
+
+    :param DHP: Matrix der DH-Parameter (rad und m)
+    :type DHP: numpy.array
+
+    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
+             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
+    :rtype: numpy.array, numpy.array
+    """
+    n_links = DHP.shape[0]      # Anzahl Transformationen
+
+    # Initialisierung und Berechnung der Denavit-Hartenberg-Matrizen
+    A = np.zeros(shape=(4, 4, n_links))
+    T = np.zeros(shape=(4, 4, n_links))
+    for u in range(n_links):
+        A[:, :, u] = np.array([[np.cos(DHP[u, 0]), -np.sin(DHP[u, 0]) * np.cos(DHP[u, 3]),
+                                np.sin(DHP[u, 0]) * np.sin(DHP[u, 3]), DHP[u, 2] * np.cos(DHP[u, 0])],
+                               [np.sin(DHP[u, 0]), np.cos(DHP[u, 0]) * np.cos(DHP[u, 3]),
+                                -np.cos(DHP[u, 0]) * np.sin(DHP[u, 3]), DHP[u, 2] * np.sin(DHP[u, 0])],
+                               [0, np.sin(DHP[u, 3]), np.cos(DHP[u, 3]), DHP[u, 1]],
+                               [0, 0, 0, 1]])
+        # Berechnung der Transformationsmatrizen
+        if u == 0:
+            T[:, :, u] = A[:, :, u]
+        else:
+            T[:, :, u] = np.linalg.multi_dot((T[:, :, u-1], A[:, :, u]))
+
+    # Initialisierung der Positionsmatrix und Orientierungsmatrix
+    Position = np.zeros(shape=(3, n_links))
+    Orientierung = np.zeros(shape=(3, n_links))
+
+    # Berechnung von Position und Orientierung der einzelnen Koordinatensysteme
+    for u in range(n_links):
+        Position[:, u] = T[:3, 3, u]
+
+        # Berechnung der Orientierung (in Kardanwinkeln)
+        alpha = np.arctan2(-T[1, 2, u], T[2, 2, u])
+        gamma = np.arctan2(-T[0, 1, u], T[0, 0, u])
+        beta = np.arctan2(T[0, 2, u], T[0, 0, u] * np.cos(gamma) - T[0, 1, u] * np.sin(gamma))
+        Orientierung[:, u] = [alpha, beta, gamma]
+
+    # Rückgabe der Orientierung in 6-FHG
+    # TODO: Rueckgabe trennen in Pos+Orientierung?
+    return np.vstack((Position, Orientierung)), T
+
+def direct_kinematics_lab4(q):
+    """
+    Achtung: verfaelschte DH-Parameter, nicht die realen des YU! (siehe Grader)
+    """
+    DHP = get_dhp_Lab4(q)
+    xE, T = ser_forkin(DHP)
+    return xE, T
+
+def direct_kinematics2(q):
+    """
+    Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Orientierung
+    in Kardanwinkel-Notation.
+    :param q: 6 Gelenkwinkel des Yu in rad
+    :type q:  numpy.array, list
+
+    :return: kartesische Positionen und Orientierungen (Kardanwinkel-Notation) Spalten stehen für die verschiedenen
+             Armsegmente. Endeffektor ist die letzte Spalte.; 4x4 Transformationsmatrizen zum zu jedem DH-KS (letztes ist Endeffektor)
+    :rtype: numpy.array, numpy.array
+    """
+    DHP = get_dhp_yu(q)
+    xE, T = ser_forkin(DHP)
+    return xE, T
+
 def direct_kinematics(q):
     """
     Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Orientierung
@@ -82,6 +179,7 @@ def direct_kinematics(q):
     # TODO: Rueckgabe trennen in Pos+Orientierung?
     return np.vstack((Position,Orientierung)), T
 
+# TODO: war ein Ansatz von Abdullah, nicht mehr benoetigt
 def direct_kinematics_7(q):
     """
     Die Funktion bestimmt aus den gegeben Gelenkwinkeln des Yus in rad die Positionen der Armenden in x,y,z und die Orientierung
@@ -484,10 +582,11 @@ def bahnplanung(q_start, q_ziel, dT):
         i = i + 1
     return Q, Qd, Qdd, t
 
-def lagrange_traj(csvPath):
+def lagrange_traj_lab4(csvPath):
     """
        Die Funktion berechnet die kinetische und potentielle Energie und die Lagrange Funktion
-       anhand des Download-Files
+       anhand des Download-Files.
+       Es werden nicht die realen Yu-Kinematikparameter verwendet! (siehe direct_kinematics_lab4())
 
        :param csvPath: Pfad zum Messschrieb
        :type csvPath:  string
@@ -498,33 +597,14 @@ def lagrange_traj(csvPath):
        """
     # Gravitationsvektor [m * s ^ -2]
     g = np.array([0, 0, -9.81])
-    # # [kg.m ^ 2] Trägheitsmomente
-    # Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
-    # # TODO: übrige Tensoreinträge fehlen
-    # # [kg] Massen
-    # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 1.025])
-    # # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 2])
-    # # TODO: Trägheiten Greifer nicht berücksichtigt?
-    # # Schwerpunktsabstände in x - y - und z - Richtung jeder KS_i[m], aus dem Yu- Datenblatt
-    # rs_i_i = np.array([[0.02, -233.26, -186.89, -0.05, 0.08, -0.13],
-    #                    [6.35, 0, -0.04, 23.89, -16.19, 1.5],
-    #                    [33.42, -4.83, 27.56, 0.75, 6.75, -73.84]])/10**3
-
-
-    # synchronisierte Bahnplahnung
-    #Q, Qd, Qdd, t = bahnplanung(q_start, q_ziel, dT)
 
     # Messschrieb einlesen
-    # np.genfromtxt(path_to_csv, dtype=float, delimiter=',', names=True)
     csv = numpy.loadtxt(csvPath, delimiter=";", dtype=float, skiprows=1)
-    # names = csv[0, :]
-    # data = csv[1:, :]
     data = csv
     Q = data[:, 1:7] * math.pi/180
     Qd = data[:, 7:13] * math.pi/180
     Q = Q.T
     Qd = Qd.T
-
 
     #### Code von Grader
     J_0_Si=np.zeros([3,3,6])#% Massenträgheitstensoren von Segment i um Schwerpunkt Si im KS_0
@@ -546,7 +626,7 @@ def lagrange_traj(csvPath):
     for index, item in enumerate(Q.T):
         q = Q[:, index]
         qd = Qd[:, index]
-        xe, T_0_i = direct_kinematics(q.T)
+        xe, T_0_i = direct_kinematics_lab4(q.T)
         # Iteration ueber alle Segmente
         for i in range(6):
             T_tmp = T_0_i[:,:,i]
@@ -581,62 +661,6 @@ def lagrange_traj(csvPath):
             U[index] = U[index] + U_i
         L[index] = T[index] - U[index]
     return U, T, L
-
-
-
-
-    # return Q,Qd
-
-    ## Code Abdullah, fehlerhaft
-    # # Initialisierungen
-    # r_GiG_KSi = np.zeros([3, 7])        # Bedeutung? r im KSi von i-1 zu i?
-    # r_GiG_KS0 = np.zeros([3, 7])
-    # r_0Gi = np.zeros([3, 7])
-    # vr_0_i = np.zeros([3, 7])
-    # rs_0_i = np.zeros([3, 6])
-    # w_i_KSi = np.zeros([3, 6])
-    # w_i_KS0 = np.zeros([3, 6])
-    # vrs_0_i = np.zeros([3, 6])
-    # Ji_KSi = np.zeros([3, 3, 6])
-    # Ji_KS0 = np.zeros([3, 3, 6])
-    # T_tr = np.zeros([6, 1])
-    # T_ro = np.zeros([6, 1])
-    # U_ = np.zeros([6, 1])
-    # U_E = np.zeros([max(Q.shape), 1])
-    # T_E = np.zeros([max(Q.shape), 1])
-    # L_E = np.zeros([max(Q.shape), 1])
-    #
-    # # Dynamikparameter aus Funktion (aus Datenblatt, entspricht Grader-Lösung)
-    # rs_i_i, Ji_KSi, m = getDynPar()
-    # for index, item in enumerate(Q.T):
-    #     # Anwendung der direkte Kinemati mit 7 Matrzen
-    #     xe, A, T = direct_kinematics_7(item.T)
-    #     # Berechnung der Schwärpunktsortsvektoren und -richtungesvektoren in KS_i und KS_0
-    #     for u in range(7):
-    #         r_GiG_KSi[:, u] = A[0:3, -1, u]
-    #         r_0Gi[:, u] = T[0:3, -1, u]
-    #         r_GiG_KS0[:, u] = np.matmul(T[0:3, 0:3, u], r_GiG_KSi[:, u])
-    #         # r_GiG_KS0[:, u] = r_0Gi[:, u]
-    #
-    #     for u in range(6):
-    #         # Geschwindigkeiten und Winkelgeschwindigkeiten
-    #         rs_0_i[:, u] = np.matmul(T[0:3, 0:3, u], rs_i_i[:, u])
-    #         w_i_KSi[-1, u] = Qd[u, index]
-    #         w_i_KS0[:, u] = np.matmul(T[0:3, 0:3, u],w_i_KSi[:, u])
-    #         vr_0_i[:, u+1] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], r_GiG_KS0[:, u+1])
-    #         vrs_0_i[:, u] = vr_0_i[:, u] + np.cross(w_i_KS0[:, u], rs_0_i[:, u])
-    #         # Trägheitsmomente
-    #         # Ji_KSi[-1, -1, u] = Jzz[u]
-    #         Ji_KS0[:, :, u] = np.matmul(np.matmul(T[0:3, 0:3, u+1], Ji_KSi[:, :, u]), T[0:3, 0:3, u+1].T)
-    #         # Potentielle und kinetische Energie
-    #         T_tr[u] = 0.5*m[u]*np.matmul(vrs_0_i[:, u].T, vrs_0_i[:, u])
-    #         T_ro[u] = 0.5*np.matmul(np.matmul(w_i_KS0[:, u].T, Ji_KS0[:, :, u]), w_i_KS0[:, u])
-    #         U_[u] = -m[u]*np.matmul(g.T, rs_0_i[:, u])
-    #     T_E[index] = sum(T_tr) + sum(T_ro)
-    #     U_E[index] = sum(U_)
-    #     L_E[index] = T_E[index]-U_E[index]
-    return U_E, T_E, L_E
-    # return U_E, T_E, L_E, t
 
 def lagrange(q_start, q_ziel, dT):
     """
