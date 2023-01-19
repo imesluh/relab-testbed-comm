@@ -498,17 +498,17 @@ def lagrange_traj(csvPath):
        """
     # Gravitationsvektor [m * s ^ -2]
     g = np.array([0, 0, -9.81])
-    # [kg.m ^ 2] Trägheitsmomente
-    Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
-    # TODO: übrige Tensoreinträge fehlen
-    # [kg] Massen
-    m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 1.025])
-    # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 2])
-    # TODO: Trägheiten Greifer nicht berücksichtigt?
-    # Schwerpunktsabstände in x - y - und z - Richtung jeder KS_i[m], aus dem Yu- Datenblatt
-    rs_i_i = np.array([[0.02, -233.26, -186.89, -0.05, 0.08, -0.13],
-                       [6.35, 0, -0.04, 23.89, -16.19, 1.5],
-                       [33.42, -4.83, 27.56, 0.75, 6.75, -73.84]])/10**3
+    # # [kg.m ^ 2] Trägheitsmomente
+    # Jzz = np.array([22640, 97760, 41879, 10590, 10590, 4000])/10**6
+    # # TODO: übrige Tensoreinträge fehlen
+    # # [kg] Massen
+    # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 1.025])
+    # # m = np.array([5.976, 9.572, 4.557, 2.588, 2.588, 2])
+    # # TODO: Trägheiten Greifer nicht berücksichtigt?
+    # # Schwerpunktsabstände in x - y - und z - Richtung jeder KS_i[m], aus dem Yu- Datenblatt
+    # rs_i_i = np.array([[0.02, -233.26, -186.89, -0.05, 0.08, -0.13],
+    #                    [6.35, 0, -0.04, 23.89, -16.19, 1.5],
+    #                    [33.42, -4.83, 27.56, 0.75, 6.75, -73.84]])/10**3
 
 
     # synchronisierte Bahnplahnung
@@ -524,6 +524,7 @@ def lagrange_traj(csvPath):
     Qd = data[:, 7:13] * math.pi/180
     Q = Q.T
     Qd = Qd.T
+
 
     #### Code von Grader
     J_0_Si=np.zeros([3,3,6])#% Massenträgheitstensoren von Segment i um Schwerpunkt Si im KS_0
@@ -558,7 +559,7 @@ def lagrange_traj(csvPath):
             # Segmentpositionen im KS0
             r_0_i[:,i] = T_tmp[0:3,-1]
             #% Winkel- und Segmentgeschwindigkeiten im KS_0
-            if index == 0:
+            if i == 0:
                 omega_0_i[:,i] = np.array([0,0,qd[i]])
                 r_0_i1_i[:,i] = r_0_i[:,i]
                 rd_0_i[:,i] = np.cross(omega_0_i[:,i],r_0_i1_i[:,i])
