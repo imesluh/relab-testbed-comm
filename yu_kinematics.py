@@ -1007,8 +1007,8 @@ def r2quat(R_in):
     :rtype: numpy.list
     """
     R = copy.deepcopy(R_in)
-    # transponieren, damit uebereinstimmend mit Robotik-Skript und Stanford-Paper
-    R = R.transpose()
+    # NICHT transponieren, damit uebereinstimmend mit Robotik-Skript (Stanford-Paper verwendet abweichende Notation)
+    #R = R.transpose()
     r11=R[0,0]
     r12=R[0,1]
     r13=R[0,2]
@@ -1116,7 +1116,7 @@ def angvec2r(u, theta):
 def quat2r(quat):
     """
     Rotationsmatrix aus Quaterionen-Darstellung berechnen
-    Quelle: Skript Robotik 1 WiSe 22/23
+    Quelle: Skript Robotik 1 WiSe 23/24
 
     Eingabe:
         Quaterionenvektor quat [1x4]
@@ -1141,6 +1141,6 @@ def quat2r(quat):
                     [2 * b * d - 2 * a * c, 2 * c * d + 2 * a * b, a ** 2 - b ** 2 - c ** 2 + d ** 2]])
     if R_q.ndim > 2:
         R_q = R_q[:,:,0]
-    # Transponierte bilden, damit mit Robotik-Skript (und Stanford-Paper uebereinstimmt)
-    R_q = R_q.transpose()
+    # KEINE Transponierte bilden, damit mit Robotik-Skript uebereinstimmend (Stanford-Paper verwendet andere Notation von R!)
+    #R_q = R_q.transpose()
     return R_q
