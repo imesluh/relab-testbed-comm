@@ -288,6 +288,8 @@ def write_target_data(filename, basedir, indices, clmnNames, yu_nodes, stop, *ar
             os.remove(basedir + '/exchange/' + filename)
         except:
             pass
+        if not os.path.exists(basedir + '/exchange/'):
+            os.makedirs(basedir + '/exchange/')
         while True:
             with open((basedir + '/exchange/' + filename), 'a') as csv_clear:
                 spamwriter = csv.writer(csv_clear, delimiter=';', lineterminator='\n')
